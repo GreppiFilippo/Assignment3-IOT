@@ -1,0 +1,5 @@
+- Back-end, running on a PC 
+- main subsystem, governing and coordinating  the whole system
+- It interacts via MQTT with the Tank Monitoring Subsystem (TMS)  
+- It interacts through the serial line with the Water Channels Subsystem (WCS)  
+- It interacts via HTTP with the Dashboard Subsystem (DBS)
