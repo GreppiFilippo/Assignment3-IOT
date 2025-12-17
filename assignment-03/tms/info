@@ -1,0 +1,3 @@
+- based on ESP
+- embedded system to monitor the rainwater level in the tank
+- It interacts with the Control Room subsystem (CUS) via MQTT
