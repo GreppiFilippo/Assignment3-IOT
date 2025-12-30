@@ -1,6 +1,6 @@
 from api.http import create_app
 from core.mock_controller import MockController
-from core.system_controller import SystemController
+#from core.system_controller import SystemController
 
 
 def main():
