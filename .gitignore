@@ -46,3 +46,5 @@
 .vscode/
 
 .venv/
+
+__pycache__/
