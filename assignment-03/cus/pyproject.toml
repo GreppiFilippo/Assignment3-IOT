@@ -1,0 +1,19 @@
+[project]
+name = "cus"
+version = "0.1.0"
+description = "Control Unit subsystem (CUS) - Back-end, running on a PC"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.124.4",
+    "uvicorn>=0.38.0",
+    "paho-mqtt>=1.6.3",
+    "requests>=2.32.0",
+    "pyserial>=3.5",
+    "pydantic>=2.12.5",
+]
+authors = [
+    {name = "Filippo Greppi", email = "filippo.greppi2@studio.unibo.it"},
+    {name = "Marcello Spagnoli", email = "marcello.spagnoli2@studio.unibo.it"}
+]
+license = "MIT"
