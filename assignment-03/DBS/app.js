@@ -3,6 +3,14 @@ const pollIntervalMs = 2000;
 const labels = [];
 const values = [];
 
+// API endpoints
+const API_BASE = "http://localhost:8000/api";
+
+const ENDPOINT_READINGS = `${API_BASE}/readings`;
+const ENDPOINT_STATUS = `${API_BASE}/status`;
+const ENDPOINT_MODE = `${API_BASE}/mode`;
+const ENDPOINT_VALVE = `${API_BASE}/valve`;
+
 const State = {
     MANUAL: "MANUAL",
     AUTOMATIC: "AUTOMATIC",
@@ -44,7 +52,24 @@ const chart = new Chart(ctx, {
                 time: {
                     tooltipFormat: "HH:mm:ss",
                     displayFormats: {
-                        second: "HH:mm:ss"
+                        second: "HH:mm:ss",
+                        minute: "HH:mm",
+                        hour: "HH:mm"
+                    }
+                },
+                ticks: {
+                    autoSkip: true,
+                    maxTicksLimit: 8,
+                    // shorten tick labels to HH:mm for readability
+                    callback: function (value, index, ticks) {
+                        try {
+                            const d = new Date(value);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${hh}:${mm}`;
+                        } catch (e) {
+                            return value;
+                        }
                     }
                 }
             },
@@ -57,7 +82,7 @@ const chart = new Chart(ctx, {
 
 async function fetchLatest() {
     try {
-        const res = await fetch(`/api/readings?limit=${N}`);
+        const res = await fetch(`${ENDPOINT_READINGS}?limit=${N}`);
         if (!res.ok) throw new Error(res.status);
 
         const data = await res.json();
@@ -72,14 +97,13 @@ async function fetchLatest() {
 
         chart.update();
 
-        const statusRes = await fetch("/api/status");
+        const statusRes = await fetch(ENDPOINT_STATUS);
         const st = await statusRes.json();
 
-        systemState.textContent =
-            st.mode ?? State.NOT_AVAILABLE;
+        systemState.textContent = st.status ?? State.NOT_AVAILABLE;
 
-        valveOpening.textContent =
-            `${st.valve ?? "--"}`;
+        // API returns `valve_opening` according to schemas
+        valveOpening.textContent = `${st.valve_opening ?? "--"}`;
 
         updateSystemStateBadge(st.mode);
         updateManualControls(st.mode);
@@ -94,7 +118,7 @@ async function fetchLatest() {
 
 function updateSystemStateBadge(mode) {
     systemState.className = "badge fs-6";
-    
+
     switch (mode) {
         case State.AUTOMATIC:
             systemState.classList.add("bg-success");
@@ -118,13 +142,22 @@ function updateManualControls(mode) {
 
 async function switchMode() {
     try {
-        const res = await fetch("/api/mode", {
-            method: "POST"
+        // read current status to determine target mode
+        const statusRes = await fetch(ENDPOINT_STATUS);
+        if (!statusRes.ok) throw new Error("No status");
+        const st = await statusRes.json();
+
+        const newMode = (st.mode === State.MANUAL) ? State.AUTOMATIC : State.MANUAL;
+
+        const payload = JSON.stringify({ mode: newMode });
+        const res = await fetch(ENDPOINT_MODE, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload
         });
-        
-        if (!res.ok) 
-            throw new Error("Failed to switch mode");
-        
+
+        if (!res.ok) throw new Error("Failed to switch mode");
+
         await fetchLatest();
     } catch (err) {
         console.error("Error switching mode:", err);
@@ -134,19 +167,20 @@ async function switchMode() {
 
 async function sendValve() {
     const value = parseInt(valveSlider.value);
-    
+
     try {
-        const res = await fetch("/api/valve", {
+        const payload = JSON.stringify({ opening: value });
+        const res = await fetch(ENDPOINT_VALVE, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ opening: value })
+            body: payload
         });
-        
-        if (!res.ok) 
+
+        if (!res.ok)
             throw new Error("Failed to set valve");
-        
+
     } catch (err) {
         console.error("Error setting valve:", err);
         alert("Failed to set valve opening");
