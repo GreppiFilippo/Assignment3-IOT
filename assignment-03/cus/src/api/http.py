@@ -1,15 +1,13 @@
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
-
+from core.base_controller import BaseController
 from api.schemas import (
     Mode,
     ModeRequest,
     ValveRequest,
     StatusResponse
 )
-
-from core.controller import BaseController
 
 
 def create_app(controller: BaseController) -> FastAPI:
