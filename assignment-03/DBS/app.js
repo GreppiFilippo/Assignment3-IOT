@@ -38,19 +38,39 @@ const chart = new Chart(ctx, {
             borderColor: "rgba(54,162,235,1)",
             pointRadius: 2,
             fill: true,
-            tension: 0.2
+            tension: 0.4
         }]
     },
     options: {
         responsive: true,
         animation: {
-            duration: 0
+            duration: 800,
+            easing: "easeOutCubic"
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    title: function (items) {
+                        try {
+                            const v = items[0].parsed && items[0].parsed.x ? items[0].parsed.x : items[0].label;
+                            const d = new Date(v);
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            const ss = String(d.getSeconds()).padStart(2, '0');
+                            return `${hh}:${mm}:${ss}`;
+                        } catch (e) {
+                            return items[0].label || '';
+                        }
+                    }
+                }
+            }
         },
         scales: {
             x: {
                 type: "time",
                 time: {
                     tooltipFormat: "HH:mm:ss",
+                    unit: 'minute',
                     displayFormats: {
                         second: "HH:mm:ss",
                         minute: "HH:mm",
@@ -58,19 +78,9 @@ const chart = new Chart(ctx, {
                     }
                 },
                 ticks: {
+                    display: false,
                     autoSkip: true,
-                    maxTicksLimit: 8,
-                    // shorten tick labels to HH:mm for readability
-                    callback: function (value, index, ticks) {
-                        try {
-                            const d = new Date(value);
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const mm = String(d.getMinutes()).padStart(2, '0');
-                            return `${hh}:${mm}`;
-                        } catch (e) {
-                            return value;
-                        }
-                    }
+                    maxTicksLimit: 8
                 }
             },
             y: {
