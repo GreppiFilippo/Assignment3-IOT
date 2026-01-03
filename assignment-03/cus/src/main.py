@@ -2,12 +2,13 @@ from api.http import create_app
 from core.mock_controller import MockController
 #from core.system_controller import SystemController
 
+# Create app instance for uvicorn to find
+controller = MockController()
+# controller = SystemController()
+app = create_app(controller)
+
 
 def main():
-    controller = MockController()
-    # controller = SystemController()
-    app = create_app(controller)
-
     try:
         import uvicorn
     except Exception as exc:
