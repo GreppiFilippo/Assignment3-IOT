@@ -4,24 +4,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Smart Tank Monitoring System - Real-time water level dashboard" />
   <title>Smart Tank Dashboard</title>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
 
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
   <!-- Chart.js 4 with date adapter -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <style>
+    .card { transition: transform 0.2s, box-shadow 0.2s; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; }
+    .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; }
+    .loading-overlay.show { display: flex; }
+  </style>
 </head>
 
 <body class="bg-light">
 
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
+    <div class="text-center">
+      <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3 text-muted">Loading dashboard data...</p>
+    </div>
+  </div>
+
   <!-- ===== NAVBAR ===== -->
-  <nav class="navbar navbar-dark bg-primary">
+  <nav class="navbar navbar-dark bg-primary sticky-top shadow-sm">
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">
-        Smart Tank Monitoring System - DBS
+        <i class="bi bi-droplet-fill"></i> Smart Tank Monitoring System
       </span>
+      <span class="badge bg-light text-primary">DBS v1.0</span>
     </div>
   </nav>
 
@@ -30,35 +55,65 @@
     <!-- ===== STATUS ROW ===== -->
     <div class="row g-4">
 
-      <div class="col-md-4">
-        <div class="card text-center shadow-sm">
+      <div class="col-md-3 col-sm-6">
+        <div class="card text-center shadow-sm h-100">
           <div class="card-body">
-            <h5 class="card-title">System State</h5>
-            <span id="systemState" class="badge bg-secondary fs-6">
+            <h5 class="card-title">
+              <i class="bi bi-info-circle"></i> System State
+            </h5>
+            <span id="systemState" class="badge bg-secondary fs-6" role="status" aria-live="polite" aria-atomic="true">
               NOT AVAILABLE
             </span>
           </div>
         </div>
       </div>
 
-      <div class="col-md-4">
-        <div class="card text-center shadow-sm">
+      <div class="col-md-3 col-sm-6">
+        <div class="card text-center shadow-sm h-100">
           <div class="card-body">
-            <h5 class="card-title">Valve Opening</h5>
-            <p class="display-6">
-              <span id="valveOpening">--</span>%
+            <h5 class="card-title">
+              <i class="bi bi-speedometer2"></i> Valve Opening
+            </h5>
+            <p class="display-6" role="status" aria-live="polite">
+              <span id="valveOpening" aria-label="Valve opening percentage">--</span>%
             </p>
           </div>
         </div>
       </div>
 
-      <div class="col-md-4">
-        <div class="card text-center shadow-sm">
+      <div class="col-md-3 col-sm-6">
+        <div class="card text-center shadow-sm h-100">
           <div class="card-body">
-            <h5 class="card-title">Mode Control</h5>
-            <button id="switchModeBtn" class="btn btn-outline-primary">
-              Switch Mode
+            <h5 class="card-title">
+              <i class="bi bi-toggle-on"></i> Mode Control
+            </h5>
+            <button id="switchModeBtn" class="btn btn-outline-primary" 
+                    aria-label="Toggle between manual and automatic mode"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="bottom" 
+                    title="Switch between MANUAL and AUTOMATIC mode">
+              <i class="bi bi-arrow-left-right"></i> Switch Mode
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3 col-sm-6">
+        <div class="card text-center shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">
+              <i class="bi bi-arrow-repeat"></i> Auto-Refresh
+            </h5>
+            <button id="toggleRefreshBtn" class="btn btn-success" 
+                    aria-label="Toggle automatic refresh"
+                    data-bs-toggle="tooltip" 
+                    data-bs-placement="bottom" 
+                    title="Pause or resume automatic data updates">
+              <i class="bi bi-pause-fill" id="refreshIcon"></i> Pause
+            </button>
+            <div class="mt-2">
+              <small class="text-muted" id="lastUpdate" aria-live="polite">Never</small>
+            </div>
           </div>
         </div>
       </div>
@@ -70,30 +125,47 @@
       <div class="col">
         <div class="card shadow-sm">
           <div class="card-body">
-            <h5 class="card-title">Rainwater Level (last N samples)</h5>
-            <canvas id="levelChart"></canvas>
+            <h5 class="card-title" id="chartTitle">
+              <i class="bi bi-graph-up"></i> Rainwater Level (last 60 samples)
+            </h5>
+            <canvas id="levelChart" role="img" aria-label="Line chart showing rainwater level over time"></canvas>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ===== MANUAL CONTROL ===== -->
-    <div class="row mt-4">
-      <div class="col-md-6">
+    <div class="row mt-4 mb-5">
+      <div class="col-lg-6 col-md-8 mx-auto">
         <div class="card shadow-sm">
           <div class="card-body">
-            <h5 class="card-title">Manual Valve Control</h5>
+            <h5 class="card-title">
+              <i class="bi bi-sliders"></i> Manual Valve Control
+            </h5>
+            <p class="text-muted small mb-3">
+              <i class="bi bi-info-circle-fill"></i> Available only in MANUAL mode
+            </p>
 
-            <label for="valveSlider" class="form-label">
+            <label for="valveSlider" class="form-label fw-bold">
               Valve Opening (%)
             </label>
 
-            <input type="range" class="form-range" min="0" max="100" id="valveSlider" disabled />
+            <input type="range" class="form-range" min="0" max="100" step="1" 
+                   id="valveSlider" disabled
+                   aria-label="Valve opening percentage slider"
+                   aria-valuemin="0" 
+                   aria-valuemax="100" 
+                   aria-valuenow="0"
+                   aria-disabled="true" />
 
-            <div class="d-flex justify-content-between align-items-center mt-2">
-              <span id="sliderValue">0%</span>
-              <button id="sendValveBtn" class="btn btn-primary" disabled>
-                Send
+            <div class="d-flex justify-content-between align-items-center mt-3">
+              <span id="sliderValue" class="badge bg-primary fs-5" aria-live="polite">0%</span>
+              <button id="sendValveBtn" class="btn btn-primary btn-lg" disabled
+                      aria-label="Send valve opening command"
+                      data-bs-toggle="tooltip" 
+                      data-bs-placement="top" 
+                      title="Send the selected valve opening percentage to the system">
+                <i class="bi bi-send-fill"></i> Send
               </button>
             </div>
 
@@ -103,6 +175,41 @@
     </div>
 
   </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-top mt-5 py-3">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6 text-center text-md-start">
+          <small class="text-muted">
+            <i class="bi bi-droplet-fill text-primary"></i> Smart Tank Monitoring System
+          </small>
+        </div>
+        <div class="col-md-6 text-center text-md-end">
+          <small class="text-muted">
+            Dashboard Subsystem (DBS) | v1.0.0 | 2026
+          </small>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Container for notifications -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="true">
+    <div id="actionToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-header">
+        <i class="bi bi-bell-fill me-2" id="toastIcon"></i>
+        <strong class="me-auto" id="toastTitle">Notification</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close notification"></button>
+      </div>
+      <div class="toast-body" id="toastBody">
+        Action completed successfully.
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- App logic -->
   <script src="app.js"></script>
