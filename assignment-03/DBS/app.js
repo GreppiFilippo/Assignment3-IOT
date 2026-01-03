@@ -1,15 +1,11 @@
-const N = 60;
-const pollIntervalMs = 2000;
-const labels = [];
-const values = [];
+/* ===== CONFIGURATION ===== */
+const MAX_READINGS = 60;
+const POLL_INTERVAL_MS = 2000;
 
-// API endpoints
-const API_BASE = "http://localhost:8000/api";
-
-const ENDPOINT_READINGS = `${API_BASE}/readings`;
-const ENDPOINT_STATUS = `${API_BASE}/status`;
-const ENDPOINT_MODE = `${API_BASE}/mode`;
-const ENDPOINT_VALVE = `${API_BASE}/valve`;
+// Chart visual constants
+const CHART_POINT_RADIUS = 2;
+const CHART_LINE_TENSION = 0.4;
+const CHART_ANIMATION_DURATION = 800;
 
 const State = {
     MANUAL: "MANUAL",
@@ -18,7 +14,18 @@ const State = {
     NOT_AVAILABLE: "NOT_AVAILABLE"
 };
 
-/* Doc Elements */
+// API endpoints
+const API_BASE = "http://localhost:8000/api";
+const ENDPOINT_READINGS = `${API_BASE}/readings`;
+const ENDPOINT_STATUS = `${API_BASE}/status`;
+const ENDPOINT_MODE = `${API_BASE}/mode`;
+const ENDPOINT_VALVE = `${API_BASE}/valve`;
+
+/* ===== DATA STORAGE ===== */
+const labels = [];
+const values = [];
+
+/* ===== DOM ELEMENTS ===== */
 const ctx = document.getElementById("levelChart");
 const sliderValue = document.getElementById("sliderValue");
 const systemState = document.getElementById("systemState");
@@ -27,6 +34,43 @@ const sendValveBtn = document.getElementById("sendValveBtn");
 const switchModeBtn = document.getElementById("switchModeBtn");
 const valveSlider = document.getElementById("valveSlider");
 
+/* ===== HELPER FUNCTIONS ===== */
+/**
+ * Formats the tooltip title for chart hover interactions.
+ * Converts timestamp to HH:MM:SS format.
+ * 
+ * @param {Array} items - Chart.js tooltip items array
+ * @returns {string} Formatted time string (HH:MM:SS) or original label on error
+ */
+function formatTooltipTitle(items) {
+    try {
+        const value = items[0].parsed && items[0].parsed.x ? items[0].parsed.x : items[0].label;
+        const date = new Date(value);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+        return items[0].label || '';
+    }
+}
+
+/**
+ * Helper function to perform POST requests with JSON payload.
+ * 
+ * @param {string} url - Target endpoint URL
+ * @param {Object} data - Data object to be sent as JSON
+ * @returns {Promise<Response>} Fetch response promise
+ */
+async function postJson(url, data) {
+    return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    });
+}
+
+/* ===== CHART SETUP ===== */
 const chart = new Chart(ctx, {
     type: "line",
     data: {
@@ -36,32 +80,18 @@ const chart = new Chart(ctx, {
             data: values,
             backgroundColor: "rgba(54,162,235,0.2)",
             borderColor: "rgba(54,162,235,1)",
-            pointRadius: 2,
+            pointRadius: CHART_POINT_RADIUS,
             fill: true,
-            tension: 0.4
+            tension: CHART_LINE_TENSION
         }]
     },
     options: {
         responsive: true,
-        animation: {
-            duration: 800,
-            easing: "easeOutCubic"
-        },
+        animation: false,
         plugins: {
             tooltip: {
                 callbacks: {
-                    title: function (items) {
-                        try {
-                            const v = items[0].parsed && items[0].parsed.x ? items[0].parsed.x : items[0].label;
-                            const d = new Date(v);
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const mm = String(d.getMinutes()).padStart(2, '0');
-                            const ss = String(d.getSeconds()).padStart(2, '0');
-                            return `${hh}:${mm}:${ss}`;
-                        } catch (e) {
-                            return items[0].label || '';
-                        }
-                    }
+                    title: formatTooltipTitle
                 }
             }
         },
@@ -69,56 +99,58 @@ const chart = new Chart(ctx, {
             x: {
                 type: "time",
                 time: {
-                    tooltipFormat: "HH:mm:ss",
-                    unit: 'minute',
-                    displayFormats: {
-                        second: "HH:mm:ss",
-                        minute: "HH:mm",
-                        hour: "HH:mm"
-                    }
+                    tooltipFormat: "HH:mm:ss"
                 },
-                ticks: {
-                    display: false,
-                    autoSkip: true,
-                    maxTicksLimit: 8
-                }
+                display: false
             },
             y: {
-                beginAtZero: true
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Level (m)'
+                }
             }
         }
     }
 });
 
+/* ===== API FUNCTIONS ===== */
+/**
+ * Fetches latest sensor readings and system status from the backend.
+ * Updates the chart with new data and refreshes UI elements (system state, valve opening).
+ * Handles errors gracefully by displaying NOT_AVAILABLE state.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function fetchLatest() {
     try {
-        const res = await fetch(`${ENDPOINT_READINGS}?limit=${N}`);
-        if (!res.ok) throw new Error(res.status);
+        const response = await fetch(`${ENDPOINT_READINGS}?limit=${MAX_READINGS}`);
+        if (!response.ok) throw new Error(response.status);
 
-        const data = await res.json();
+        const data = await response.json();
 
         labels.length = 0;
         values.length = 0;
 
-        data.forEach(p => {
-            labels.push(new Date(p.ts));
-            values.push(p.value);
+        data.forEach(reading => {
+            labels.push(new Date(reading.ts));
+            values.push(reading.value);
         });
 
         chart.update();
 
-        const statusRes = await fetch(ENDPOINT_STATUS);
-        const st = await statusRes.json();
+        const statusResponse = await fetch(ENDPOINT_STATUS);
+        const status = await statusResponse.json();
 
-        systemState.textContent = st.status ?? State.NOT_AVAILABLE;
+        systemState.textContent = status.status ?? State.NOT_AVAILABLE;
+        valveOpening.textContent = `${status.valve_opening ?? "--"}`;
 
-        // API returns `valve_opening` according to schemas
-        valveOpening.textContent = `${st.valve_opening ?? "--"}`;
+        updateSystemStateBadge(status.mode);
+        updateManualControls(status.mode);
 
-        updateSystemStateBadge(st.mode);
-        updateManualControls(st.mode);
-
-    } catch {
+    } catch (error) {
+        console.error("Error fetching data:", error);
         systemState.textContent = State.NOT_AVAILABLE;
         valveOpening.textContent = "--";
         updateSystemStateBadge(State.NOT_AVAILABLE);
@@ -126,6 +158,13 @@ async function fetchLatest() {
     }
 }
 
+/**
+ * Updates the visual appearance of the system state badge based on current mode.
+ * Applies Bootstrap color classes: success (automatic), warning (manual), 
+ * danger (unconnected), secondary (not available).
+ * 
+ * @param {string} mode - Current system mode from State enum
+ */
 function updateSystemStateBadge(mode) {
     systemState.className = "badge fs-6";
 
@@ -144,65 +183,78 @@ function updateSystemStateBadge(mode) {
     }
 }
 
+/**
+ * Enables or disables manual control UI elements based on system mode.
+ * Manual controls (slider and button) are only active in MANUAL mode.
+ * 
+ * @param {string} mode - Current system mode from State enum
+ */
 function updateManualControls(mode) {
     const isManual = (mode === State.MANUAL);
     valveSlider.disabled = !isManual;
     sendValveBtn.disabled = !isManual;
 }
 
+/**
+ * Toggles system mode between MANUAL and AUTOMATIC.
+ * Fetches current status, determines opposite mode, sends update request,
+ * and refreshes the UI on success.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function switchMode() {
     try {
-        // read current status to determine target mode
-        const statusRes = await fetch(ENDPOINT_STATUS);
-        if (!statusRes.ok) throw new Error("No status");
-        const st = await statusRes.json();
+        const statusResponse = await fetch(ENDPOINT_STATUS);
+        if (!statusResponse.ok) throw new Error("No status");
+        const status = await statusResponse.json();
 
-        const newMode = (st.mode === State.MANUAL) ? State.AUTOMATIC : State.MANUAL;
+        const newMode = (status.mode === State.MANUAL) ? State.AUTOMATIC : State.MANUAL;
 
-        const payload = JSON.stringify({ mode: newMode });
-        const res = await fetch(ENDPOINT_MODE, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: payload
-        });
-
-        if (!res.ok) throw new Error("Failed to switch mode");
+        const response = await postJson(ENDPOINT_MODE, { mode: newMode });
+        if (!response.ok) throw new Error("Failed to switch mode");
 
         await fetchLatest();
-    } catch (err) {
-        console.error("Error switching mode:", err);
+    } catch (error) {
+        console.error("Error switching mode:", error);
         alert("Failed to switch mode");
     }
 }
 
+/**
+ * Sends the current slider value as valve opening command to the backend.
+ * Validates the value is within acceptable range (0-100) before sending.
+ * Only functional when system is in MANUAL mode.
+ * 
+ * @async
+ * @returns {Promise<void>}
+ */
 async function sendValve() {
-    const value = parseInt(valveSlider.value);
+    const opening = parseInt(valveSlider.value);
+
+    if (isNaN(opening) || opening < 0 || opening > 100) {
+        console.error("Invalid valve opening value:", opening);
+        return;
+    }
 
     try {
-        const payload = JSON.stringify({ opening: value });
-        const res = await fetch(ENDPOINT_VALVE, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: payload
-        });
+        const response = await postJson(ENDPOINT_VALVE, { opening });
+        if (!response.ok) throw new Error("Failed to set valve");
 
-        if (!res.ok)
-            throw new Error("Failed to set valve");
-
-    } catch (err) {
-        console.error("Error setting valve:", err);
+    } catch (error) {
+        console.error("Error setting valve:", error);
         alert("Failed to set valve opening");
     }
 }
 
-valveSlider.addEventListener("input", (e) => {
-    sliderValue.textContent = e.target.value + "%";
+/* ===== EVENT HANDLERS ===== */
+valveSlider.addEventListener("input", (event) => {
+    sliderValue.textContent = event.target.value + "%";
 });
 
 switchModeBtn.addEventListener("click", switchMode);
 sendValveBtn.addEventListener("click", sendValve);
 
-setInterval(fetchLatest, pollIntervalMs);
+/* ===== INITIALIZATION ===== */
+setInterval(fetchLatest, POLL_INTERVAL_MS);
 fetchLatest();
