@@ -1,12 +1,12 @@
 #!/bin/sh
-# Script per eseguire il backend CUS
+# Script to run the CUS backend
 
-# Controlla se uvicorn è installato
+# Check if uvicorn is installed
 if command -v uv > /dev/null 2>&1; then
-    echo "uv è installato. Avvio con uv..."
+    echo "uv is installed. Starting with uv..."
     uv run src/main.py
 else
-    echo "uv non è installato. Creo ambiente virtuale e installo dipendenze..."
+    echo "uv is not installed. Creating virtual environment and installing dependencies..."
     
     # Create virtualenv
     python3 -m venv .venv
@@ -19,10 +19,10 @@ else
     if ! command -v poetry > /dev/null 2>&1; then
         pip install poetry
     fi
-
+    
     # Install all dependencies from pyproject.toml
     poetry install
-
+    
     # Run the script with the virtualenv managed by Poetry
     poetry run python src/main.py
 fi
