@@ -1,6 +1,10 @@
+from utils.logger import get_logger
 from abc import ABC, abstractmethod
 import asyncio
 from typing import Protocol, Any, List, Optional
+
+
+logger = get_logger(__name__)
 
 
 class BaseModule(Protocol):
@@ -23,6 +27,7 @@ class BaseService(ABC):
         self.modules: List[BaseModule] = []
         self._task: Optional[asyncio.Task] = None
         self._running = False
+        logger.info(f"Service '{service_name}' created")
 
     def add_module(self, module: BaseModule):
         self.modules.append(module)
@@ -39,12 +44,14 @@ class BaseService(ABC):
     # --- async lifecycle API ---
     async def start(self):
         """Start the service. If `run()` is implemented, schedule it as a task."""
+        logger.info(f"Starting service '{self.service_name}'")
         if hasattr(self, "run") and asyncio.iscoroutinefunction(getattr(self, "run")):
             self._running = True
             self._task = asyncio.create_task(self.run())
 
     async def stop(self):
         """Stop the service and cancel the background task if present."""
+        logger.info(f"Stopping service '{self.service_name}'")
         self._running = False
         if self._task:
             self._task.cancel()

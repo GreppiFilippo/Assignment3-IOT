@@ -1,7 +1,10 @@
+from utils.logger import get_logger
 import asyncio
 from typing import Any, Optional
 
 from .base_service import BaseService
+
+logger = get_logger(__name__)
 
 
 class MQTTService(BaseService):
@@ -18,18 +21,22 @@ class MQTTService(BaseService):
         self._client = None
 
     async def connect(self):
+        logger.info("MQTT connecting...")
         # TODO: implement connection using chosen MQTT client
         await asyncio.sleep(0)
 
     async def disconnect(self):
+        logger.info("MQTT disconnecting...")
         # TODO: disconnect/cleanup
         await asyncio.sleep(0)
 
     async def publish(self, topic: str, payload: str):
+        logger.debug(f"Publishing to {topic}: {payload}")
         # TODO: publish using client
         await asyncio.sleep(0)
 
     async def subscribe(self, topic: str):
+        logger.info(f"Subscribing to {topic}")
         # TODO: subscribe and forward messages to event_bus
         await asyncio.sleep(0)
 

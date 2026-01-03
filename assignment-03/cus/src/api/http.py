@@ -1,3 +1,4 @@
+from utils.logger import get_logger
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
@@ -8,6 +9,8 @@ from api.schemas import (
     ValveRequest,
     StatusResponse
 )
+
+logger = get_logger(__name__)
 
 
 def create_app(controller: BaseController) -> FastAPI:
@@ -42,9 +45,10 @@ def create_app(controller: BaseController) -> FastAPI:
         Return latest readings. Each item: { "ts": <timestamp>, "value": <number> }
         """
         try:
+            logger.debug(f"Fetching {limit} readings")
             return controller.get_readings(limit)
-        except Exception:
-            # return empty list if backend not ready
+        except Exception as e:
+            logger.error(f"Failed to get readings: {e}")
             return []
 
     # -----------------------------
@@ -55,6 +59,7 @@ def create_app(controller: BaseController) -> FastAPI:
         """
         Returns the current system status including mode and valve opening.
         """
+        logger.debug("Status requested")
         return {
             "status": controller.get_status(),
             "mode": controller.get_mode(),
@@ -70,8 +75,10 @@ def create_app(controller: BaseController) -> FastAPI:
         Switch system mode: AUTOMATIC or MANUAL.
         """
         try:
+            logger.info(f"Setting mode to {req.mode}")
             controller.set_mode(Mode(req.mode))
         except ValueError:
+            logger.warning(f"Invalid mode requested: {req.mode}")
             raise HTTPException(status_code=400, detail="Invalid mode")
 
         return {"result": "ok"}
@@ -86,17 +93,20 @@ def create_app(controller: BaseController) -> FastAPI:
         Allowed only in MANUAL mode.
         """
         if not controller.is_manual():
+            logger.warning("Valve setting attempted while not in MANUAL mode")
             raise HTTPException(
                 status_code=409,
                 detail="System not in MANUAL mode"
             )
 
         if not (0 <= req.opening <= 100):
+            logger.warning(f"Invalid valve opening value: {req.opening}")
             raise HTTPException(
                 status_code=400,
                 detail="Valve opening must be between 0 and 100"
             )
 
+        logger.info(f"Setting valve opening to {req.opening}%")
         controller.manual_valve(req.opening)
         return {"result": "ok"}
 

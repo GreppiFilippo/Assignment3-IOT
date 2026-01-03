@@ -1,5 +1,8 @@
+from utils.logger import get_logger
 import asyncio
 from typing import Any, Callable, Dict, List
+
+logger = get_logger(__name__)
 
 
 class Event:
@@ -26,9 +29,11 @@ class EventDispatcher:
         self._queue: asyncio.Queue = asyncio.Queue()
         self._task: asyncio.Task = None
         self._running = False
+        logger.info("EventDispatcher initialized")
 
     def subscribe(self, topic: str, callback: Callable[[Event], Any]):
         self._subs.setdefault(topic, []).append(callback)
+        logger.debug(f"Subscribed to topic: {topic}")
 
     def unsubscribe(self, topic: str, callback: Callable[[Event], Any]):
         if topic in self._subs:
@@ -38,14 +43,17 @@ class EventDispatcher:
                 pass
 
     async def publish(self, topic: str, payload: Any = None):
+        logger.debug(f"Publishing event to topic: {topic}")
         await self._queue.put(Event(topic, payload))
 
     async def start(self):
         if not self._running:
+            logger.info("Starting EventDispatcher")
             self._running = True
             self._task = asyncio.create_task(self._run())
 
     async def stop(self):
+        logger.info("Stopping EventDispatcher")
         self._running = False
         if self._task:
             self._task.cancel()
@@ -57,6 +65,7 @@ class EventDispatcher:
             while self._running:
                 event: Event = await self._queue.get()
                 callbacks = self._subs.get(event.topic, []) + self._subs.get("*", [])
+                logger.debug(f"Dispatching event {event.topic} to {len(callbacks)} subscribers")
                 for cb in callbacks:
                     try:
                         if asyncio.iscoroutinefunction(cb):
@@ -65,8 +74,8 @@ class EventDispatcher:
                             # run sync callback in default loop executor
                             loop = asyncio.get_running_loop()
                             loop.run_in_executor(None, cb, event)
-                    except Exception:
-                        # swallow per-callback exceptions; callers can log
-                        pass
+                    except Exception as e:
+                        logger.error(f"Error in event callback for {event.topic}: {e}")
         except asyncio.CancelledError:
+            logger.debug("EventDispatcher run loop cancelled")
             return
