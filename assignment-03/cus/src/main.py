@@ -1,28 +1,30 @@
 from utils.logger import setup_logging, get_logger
-from api.http import create_app
-from core.mock_controller import MockController
-#from core.system_controller import SystemController
+import asyncio
+from core.system_controller import SystemController
+import config
+
 
 # Setup logging
-setup_logging(log_level="INFO", log_file="logs/cus.log")
+setup_logging(log_level=config.LOG_LEVEL, log_file=config.LOG_FILE)
 logger = get_logger(__name__)
 
-# Create app instance for uvicorn to find
-logger.info("Initializing CUS application")
-controller = MockController()
-# controller = SystemController()
-app = create_app(controller)
-
-
-def main():
+async def main():
+    logger.info("Initializing CUS application")
+    
+    controller = SystemController()
+    
     try:
-        import uvicorn
-    except Exception as exc:
-        raise RuntimeError("uvicorn is required to run the server directly") from exc
-
-    logger.info("Starting CUS server on localhost:8000")
-    uvicorn.run(app, host="localhost", port=8000)
-
+        await controller.run()
+    except asyncio.CancelledError:
+        logger.info("Application cancelled, shutting down...")
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, shutting down...")
+    finally:
+        # Ensure clean shutdown of all services
+        await controller.stop()
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Shutdown requested")
