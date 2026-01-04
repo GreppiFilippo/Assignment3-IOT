@@ -130,7 +130,7 @@ const chart = new Chart(ctx, {
     data: {
         labels: labels,
         datasets: [{
-            label: "Rainwater level (m)",
+            label: "Rainwater level (cm)",
             data: values,
             backgroundColor: "rgba(54,162,235,0.2)",
             borderColor: "rgba(54,162,235,1)",
@@ -161,7 +161,7 @@ const chart = new Chart(ctx, {
                 beginAtZero: true,
                 title: {
                     display: true,
-                    text: 'Level (m)'
+                    text: 'Level (cm)'
                 }
             }
         }
@@ -197,7 +197,7 @@ async function fetchLatest() {
         const statusResponse = await fetch(ENDPOINT_STATUS);
         const status = await statusResponse.json();
 
-        systemState.textContent = status.status ?? State.NOT_AVAILABLE;
+        systemState.textContent = status.state ?? State.NOT_AVAILABLE;
         valveOpening.textContent = `${status.valve_opening ?? "--"}`;
 
         // Sync slider with current valve opening ONLY if user is not interacting
@@ -206,8 +206,8 @@ async function fetchLatest() {
             sliderValue.textContent = `${status.valve_opening}%`;
         }
 
-        updateSystemStateBadge(status.mode);
-        updateManualControls(status.mode);
+        updateSystemStateBadge(status.state);
+        updateManualControls(status.state);
         updateLastUpdateTimestamp();
 
     } catch (error) {
