@@ -8,17 +8,24 @@ logger = get_logger(__name__)
 class Event:
     """
     Generic event object exchanged through the dispatcher.
-    
-    Args:
-        topic: Event topic/channel identifier
-        payload: Optional data associated with the event
     """
 
     def __init__(self, topic: str, payload: Any = None):
+        """
+        Initialize an event instance.
+        
+        :param self: The instance
+        :param topic: Event topic/channel identifier
+        :type topic: str
+        :param payload: Optional data associated with the event
+        :type payload: Any
+        """
+
         self.topic = topic
         self.payload = payload
 
     def __repr__(self) -> str:
+        """Return a string representation of the event."""
         return f"Event(topic='{self.topic}', payload={self.payload})"
 
 
