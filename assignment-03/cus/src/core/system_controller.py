@@ -145,7 +145,7 @@ class SystemController(BaseController):
         if level >= L2_THRESHOLD:
             logger.warning(f"Water level {level} >= L2 ({L2_THRESHOLD}), opening valve 100%")
             self._l1_exceeded_time = None  # Reset L1 timer
-            self._set_valve_opening(100.0)
+            asyncio.create_task(self._set_valve_opening(100.0))
         
         # High level L1: open valve at 50% after T1 duration
         elif level >= L1_THRESHOLD:
@@ -156,21 +156,21 @@ class SystemController(BaseController):
                 elapsed = (datetime.now() - self._l1_exceeded_time).total_seconds()
                 if elapsed >= T1_DURATION and self._valve_opening < 50.0:
                     logger.warning(f"Water level above L1 for {elapsed}s >= T1, opening valve 50%")
-                    self._set_valve_opening(50.0)
+                    asyncio.create_task(self._set_valve_opening(50.0))
         
         # Normal level: close valve if it was open
         else:
             self._l1_exceeded_time = None  # Reset timer
             if self._valve_opening > 0.0:
                 logger.info(f"Water level {level} below L1, closing valve")
-                self._set_valve_opening(0.0)
+                asyncio.create_task(self._set_valve_opening(0.0))
     
-    def _set_valve_opening(self, opening: float) -> None:
+    async def _set_valve_opening(self, opening: float) -> None:
         """Set valve opening and send command to WCS via serial."""
         logger.info(f"Setting valve opening to {opening}%")
         
         # Try to send command to WCS
-        success = self._serial_service.send_message({"valve": opening})
+        success = await self._serial_service.send_message({"valve": opening})
         
         if success:
             # Mark as pending until WCS confirms
@@ -181,7 +181,7 @@ class SystemController(BaseController):
     
     async def _send_mode_to_wcs(self) -> None:
         """Send current mode to WCS for LCD display."""
-        self._serial_service.send_message({"mode": self._state.value})
+        await self._serial_service.send_message({"mode": self._state.value})
     
     # -------------------- Event Bus Handlers --------------------
     
@@ -226,7 +226,7 @@ class SystemController(BaseController):
     async def _on_potentiometer_value(self, value: float) -> None:
         """Handle potentiometer change from WCS (in MANUAL mode)."""
         if self._mode == Mode.MANUAL:
-            self._set_valve_opening(value)
+            await self._set_valve_opening(value)
     
     # -------------------- HTTP Handlers --------------------
     
@@ -292,7 +292,7 @@ class SystemController(BaseController):
             return {"result": "error", "message": "Not in MANUAL mode"}
         
         logger.info(f"Dashboard set valve to {req.opening}%")
-        self._set_valve_opening(req.opening)
+        await self._set_valve_opening(req.opening)
         return {"result": "ok"}
     
     async def _health_check(self) -> Dict[str, str]:
