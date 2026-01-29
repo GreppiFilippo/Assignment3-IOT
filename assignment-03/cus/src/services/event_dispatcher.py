@@ -72,16 +72,24 @@ class EventDispatcher:
 
     # ---------- Subscription API ----------
 
-    def subscribe(self, topic: str, callback: Callable[[Event], Any]) -> None:
+    def subscribe(self, topic: str, callback: Callable[[Event], Any]) -> 'EventDispatcher':
         """
-        Subscribe a callback to a specific event topic.
+        Subscribe a callback to a specific event topic (Builder pattern).
         
         Args:
             topic: Topic to subscribe to (use "*" for all events)
             callback: Function to call when event is published (sync or async)
+        
+        Returns:
+            Self for method chaining
+        
+        Example:
+            dispatcher.subscribe("data", handle_data) \
+                      .subscribe("error", handle_error)
         """
         self._subscribers.setdefault(topic, []).append(callback)
         logger.debug(f"Subscribed callback to topic '{topic}'")
+        return self
 
     def unsubscribe(self, topic: str, callback: Callable[[Event], Any]) -> None:
         """

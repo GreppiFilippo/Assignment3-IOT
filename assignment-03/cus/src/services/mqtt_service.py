@@ -39,16 +39,27 @@ class MQTTService(BaseService):
         self._client.on_message = self.__on_message
         self._client.on_disconnect = self.__on_disconnect
 
-    def register_handler(self, key: str, callback: Callable[..., None]):
+    def register_handler(self, key: str, callback: Callable[..., None]) -> 'MQTTService':
         """
-        Register a handler for a specific key in MQTT messages.
+        Register a handler for a specific key in MQTT messages (Builder pattern).
         Multiple handlers can be registered for the same key.
-        Example: key='level', callback=lambda value: event_bus.publish('new_level', value)
+        
+        Args:
+            key: Key to match in MQTT message payload
+            callback: Handler function to call when key is found
+        
+        Returns:
+            Self for method chaining
+        
+        Example:
+            mqtt.register_handler('level', handle_level) \
+                .register_handler('status', handle_status)
         """
         if key not in self._handlers:
             self._handlers[key] = []
         self._handlers[key].append(callback)
         logger.info(f"{self.name} registered handler for '{key}'")
+        return self
 
     async def run(self):
         """Run MQTT service"""

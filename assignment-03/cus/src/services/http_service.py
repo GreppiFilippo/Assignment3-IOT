@@ -6,7 +6,7 @@ from typing import Callable, Any, Dict, List
 from .base_service import BaseService
 from .event_dispatcher import EventDispatcher
 from utils.logger import get_logger
-from ..config import (ALLOWED_ORIGINS, ALLOWED_CREDENTIALS, ALLOWED_METHODS, ALLOWED_HEADERS)
+from config import (ALLOWED_ORIGINS, ALLOWED_CREDENTIALS, ALLOWED_METHODS, ALLOWED_HEADERS)
 
 logger = get_logger(__name__)
 
@@ -60,9 +60,9 @@ class HttpService(BaseService):
         path: str, 
         handler: Callable[..., Any],
         **route_kwargs
-    ) -> None:
+    ) -> 'HttpService':
         """
-        Register an HTTP endpoint handler.
+        Register an HTTP endpoint handler (Builder pattern).
         
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
@@ -70,9 +70,12 @@ class HttpService(BaseService):
             handler: Callback function (sync or async) to handle requests
             **route_kwargs: Additional FastAPI route parameters (response_model, etc.)
         
+        Returns:
+            Self for method chaining
+        
         Example:
-            http.register_endpoint("GET", "/status", get_status_handler)
-            http.register_endpoint("POST", "/valve", set_valve_handler, response_model=ValveResponse)
+            http.register_endpoint("GET", "/status", get_status_handler) \
+                .register_endpoint("POST", "/valve", set_valve_handler)
         """
         method = method.upper()
         
@@ -88,6 +91,7 @@ class HttpService(BaseService):
             raise ValueError(f"Unsupported HTTP method: {method}")
         
         logger.info(f"{self.name} registered {method} {path}")
+        return self
 
     async def run(self):
         """Run HTTP service with uvicorn server."""
