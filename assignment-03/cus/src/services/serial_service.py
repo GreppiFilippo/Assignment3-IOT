@@ -108,7 +108,7 @@ class SerialService(BaseService):
         except Exception as e:
             logger.exception(f"{self.name} error processing message: {e}")
     
-    def send_message(self, data: dict) -> bool:
+    async def send_message(self, data: dict) -> bool:
         """
         Send JSON message to WCS via serial.
         
@@ -127,9 +127,10 @@ class SerialService(BaseService):
             return False
         
         try:
+            loop = asyncio.get_running_loop()
             message = json.dumps(data) + '\n'
-            self._serial.write(message.encode('utf-8'))
-            self._serial.flush()
+            await loop.run_in_executor(None, self._serial.write, message.encode('utf-8'))
+            await loop.run_in_executor(None, self._serial.flush)
             logger.debug(f"{self.name} sent: {data}")
             return True
         except SerialException as e:
