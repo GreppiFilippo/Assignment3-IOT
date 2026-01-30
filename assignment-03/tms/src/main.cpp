@@ -16,6 +16,13 @@ void Task1code(void* pvParameters) {
 
 TaskHandle_t Task1;
 
-void setup() {}
+void setup()
+{
+#ifdef HW_TEST
+// Test code here
+#else
+
+#endif
+}
 
 void loop() {}

@@ -3,42 +3,50 @@
 
 #include <esp32-hal.h>
 
+#include <devices/Led.hpp>
+#include <devices/Sonar.hpp>
+
 #include "config.hpp"
 #include "kernel/Logger.hpp"
 
 HWPlatform::HWPlatform() {
-  this->greenLed = new Led(LED_GREEN_PIN);
-  this->redLed = new Led(LED_RED_PIN);
-  this->sonar = new Sonar(SONAR_ECHO_PIN, SONAR_TRIG_PIN, SONAR_TIMEOUT_US);
+  this->aliveLight = new Led(LED_GREEN_PIN);
+  this->errorLight = new Led(LED_RED_PIN);
+  this->proximitySensor =
+      new Sonar(SONAR_ECHO_PIN, SONAR_TRIG_PIN, SONAR_TIMEOUT_US);
 }
+
+ProximitySensor* HWPlatform::getProximitySensor() {
+  return this->proximitySensor;
+}
+
+Light* HWPlatform::getAliveLight() { return this->aliveLight; }
+
+Light* HWPlatform::getErrorLight() { return this->errorLight; }
 
 void HWPlatform::test() {
-  // Test LEDs
-  this->greenLed->switchOn();
-  this->redLed->switchOn();
+  Logger.log(F("HWPlatform: Testing hardware..."));
+
+  Logger.log(F("HWPlatform: Testing alive light..."));
+  this->aliveLight->switchOn();
   delay(500);
-  this->greenLed->switchOff();
-  this->redLed->switchOff();
+  this->aliveLight->switchOff();
   delay(500);
 
-  // Test Sonar
-  float distance = this->sonar->getDistance();
-  Logger::instance().log("Sonar distance: ");
-  char buffer[16];
-  snprintf(buffer, sizeof(buffer), "%.2f", distance);
-  Logger::instance().log(buffer);
-  Logger::instance().log(" cm");
+  Logger.log(F("HWPlatform: Testing error light..."));
+  this->errorLight->switchOn();
+  delay(500);
+  this->errorLight->switchOff();
+  delay(500);
 
-  this->sonar->setTemperature(25.0);
-  distance = this->sonar->getDistance();
-  Logger::instance().log("Sonar distance at 25C: ");
-  snprintf(buffer, sizeof(buffer), "%.2f", distance);
-  Logger::instance().log(buffer);
-  Logger::instance().log(" cm");
+  Logger.log(F("HWPlatform: Testing proximity sensor..."));
+
+  for (int i = 0; i < 5; i++) {
+    float distance = this->proximitySensor->getDistance();
+    Logger.log("HWPlatform: Proximity sensor reading " + String(i + 1) + ": " +
+               String(distance));
+    delay(500);
+  }
+
+  Logger.log(F("HWPlatform: Hardware test completed."));
 }
-
-Sonar* HWPlatform::getSonar() { return this->sonar; }
-
-Led* HWPlatform::getRedLed() { return this->redLed; }
-
-Led* HWPlatform::getGreenLed() { return this->greenLed; }

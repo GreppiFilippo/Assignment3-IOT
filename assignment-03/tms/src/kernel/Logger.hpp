@@ -1,30 +1,16 @@
-#ifndef __LOGGER_HPP__
-#define __LOGGER_HPP__
+#ifndef __LOGGER__
+#define __LOGGER__
+
+#include "Arduino.h"
 
 /**
- * @brief A simple logger that outputs messages to the serial console
- *
+ * @brief Service for logging messages.
  */
-class Logger {
+class LoggerService {
  public:
-  /**
-   * @brief Get the singleton instance of Logger
-   *
-   * @return Logger& The Logger instance
-   */
-  static Logger& instance();
-
-  /**
-   * @brief Log a message to the serial output
-   *
-   * @param message The message to log
-   */
-  void log(const char* message);
-
- private:
-  Logger();
-  Logger(const Logger&) = delete;
-  Logger& operator=(const Logger&) = delete;
+  void log(const String& msg);
+  void log(const __FlashStringHelper* msg);
 };
+extern LoggerService Logger;
 
-#endif  // __LOGGER_HPP__
+#endif  // __LOGGER__

@@ -1,14 +1,14 @@
 #ifndef __HWPLATFORM_HPP__
 #define __HWPLATFORM_HPP__
 
-#include <devices/Led.hpp>
-#include <devices/Sonar.hpp>
+#include <devices/Light.hpp>
+#include <devices/ProximitySensor.hpp>
 
 class HWPlatform {
  private:
-  Led* greenLed;
-  Led* redLed;
-  Sonar* sonar;
+  Light* aliveLight;
+  Light* errorLight;
+  ProximitySensor* proximitySensor;
 
  public:
   /**
@@ -24,25 +24,25 @@ class HWPlatform {
   void test();
 
   /**
-   * @brief Get the Sonar
+   * @brief Get the Proximity Sensor
    *
-   * @return Sonar* The sonar
+   * @return The proximity sensor
    */
-  Sonar* getSonar();
+  ProximitySensor* getProximitySensor();
 
   /**
-   * @brief Get the Red Led
+   * @brief Get the Alive Light object
    *
-   * @return Led* The red Led
+   * @return The alive light
    */
-  Led* getRedLed();
+  Light* getAliveLight();
 
   /**
-   * @brief Get the Green Led
+   * @brief Get the Error Light object
    *
-   * @return Led* The green Led
+   * @return The error light
    */
-  Led* getGreenLed();
+  Light* getErrorLight();
 };
 
 #endif  // __HWPLATFORM_HPP__
