@@ -3,12 +3,13 @@
 
 class ConnectionService
 {
-   private:
+   protected:
     bool connected = false;
 
    public:
     virtual void init() = 0;
     virtual void connect() = 0;
+    virtual void send(const char* data, size_t length) = 0;
     bool isConnected() { return connected; }
 };
 

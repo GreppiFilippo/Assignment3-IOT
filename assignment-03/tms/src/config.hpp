@@ -56,4 +56,6 @@
  ***********************/
 #define BAUD 115200
 
+#define SENDING_BUFFER_SIZE 256
+
 #endif  // CONFIG_HPP

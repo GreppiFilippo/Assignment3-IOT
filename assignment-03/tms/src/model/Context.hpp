@@ -7,6 +7,7 @@ class Context
     /* data */
    public:
     Context(/* args */);
+    void populateJsonDocument(JsonDocument& doc);
 };
 
 #endif  // __CONTEXT__
