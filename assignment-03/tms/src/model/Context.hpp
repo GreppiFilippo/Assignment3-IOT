@@ -4,9 +4,10 @@
 class Context
 {
    private:
-    /* data */
+    float waterLevel;
    public:
     Context(/* args */);
+    void setWaterLevel(float level);
 };
 
 #endif  // __CONTEXT__
