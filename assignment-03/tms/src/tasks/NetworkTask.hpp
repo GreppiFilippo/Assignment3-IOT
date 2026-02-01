@@ -1,9 +1,23 @@
 #ifndef __NETWORK_TASK__
 #define __NETWORK_TASK__
 
-class NetworkTask
+#include <devices/Light.hpp>
+
+#include "kernel/Task.hpp"
+#include "kernel/services/ConnectionService.hpp"
+#include "model/Context.hpp"
+
+class NetworkTask : public Task
 {
    private:
+    ConnectionService* pConnectionService;
+    Context* pContext;
+    Light* pAliveLight;
+    Light* pErrorLight;
+
+    bool justEntered;
+    unsigned long stateTimestamp;
+
     /**
      * @brief Network Task State
      *
@@ -19,7 +33,21 @@ class NetworkTask
     } state;
 
    public:
-    NetworkTask(/* args */);
+    /**
+     * @brief Construct a new Network Task object
+     *
+     * @param pConnectionService the connection service
+     * @param pContext the context
+     */
+    NetworkTask(ConnectionService* pConnectionService, Light* pAliveLight, Light* pErrorLight,
+                Context* pContext);
+    void init() override;
+    void tick() override;
+
+   private:
+    void setState(State newState);
+    long elapsedTimeInState();
+    bool checkAndSetJustEntered();
 };
 
 #endif  // __NETWORK_TASK__
