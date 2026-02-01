@@ -6,7 +6,7 @@ class Context
    private:
     float waterLevel;
    public:
-    Context(/* args */);
+    Context();
     void setWaterLevel(float level);
 };
 
