@@ -18,8 +18,7 @@
 /***********************
  * SAMPLING PARAMETERS
  ***********************/
-#define SAMPLING_INTERVAL_MS \
-  1000  // intervallo di campionamento in millisecondi
+#define SAMPLING_INTERVAL_MS 1000  // intervallo di campionamento in millisecondi
 
 /***********************
  * MQTT CONFIGURATION
@@ -41,8 +40,8 @@
 /***********************
  * LED STATES
  ***********************/
-#define NETWORK_OK HIGH
-#define NETWORK_FAIL LOW
+#define HIGH
+#define LOW
 
 /***********************
  * FSM STATES
