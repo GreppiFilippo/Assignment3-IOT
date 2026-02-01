@@ -4,9 +4,11 @@
 class Context
 {
    private:
-    /* data */
+    float waterLevel;
+
    public:
-    Context(/* args */);
+    Context();
+    void setWaterLevel(float level);
     void populateJsonDocument(JsonDocument& doc);
 };
 
