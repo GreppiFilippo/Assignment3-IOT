@@ -18,9 +18,8 @@ class SystemTask : public Task {
  public:
   SystemTask(Context* context, Button* btn, Potentiometer* pot);
   void tick() override;
-  void setState(State s);
 
  private:
-  long elapsedTimeInState();
+  void setState(State s);
   bool checkAndSetJustEntered();
 };

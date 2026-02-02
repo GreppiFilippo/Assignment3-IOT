@@ -62,8 +62,6 @@ void SystemTask::setState(State s) {
   justEntered = true;
 }
 
-long SystemTask::elapsedTimeInState() { return millis() - stateTimestamp; }
-
 bool SystemTask::checkAndSetJustEntered() {
   bool bak = justEntered;
   if (justEntered) {

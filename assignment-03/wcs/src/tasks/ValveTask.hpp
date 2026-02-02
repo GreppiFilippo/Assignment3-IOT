@@ -6,14 +6,21 @@ class ValveTask : public Task {
  private:
   Context* pContext;
   ServoMotor* pServo;
+  int currentPosition;
+
+  long stateTimestamp;
+  bool justEntered;
 
   enum State {
     IDLE,
-    ADJUSTING,
-  };
+    MOVING,
+  } state;
 
-  void adjustValve();
+  void moveValve(int position);
   bool inPosition();
+  void setState(State s);
+  bool checkAndSetJustEntered();
+  long elapsedTimeInState();
 
  public:
   ValveTask(Context* context, ServoMotor* servo);
