@@ -23,13 +23,13 @@
 /***********************
  * WIFI CONFIGURATION
  ***********************/
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "Redmi 10"
+#define WIFI_PASSWORD "12345678"
 
 /***********************
  * MQTT CONFIGURATION
  ***********************/
-#define MQTT_BROKER "broker.hivemq.com"
+#define MQTT_BROKER "broker.mqtt-dashboard.com"
 #define MQTT_PORT 1883
 #define MQTT_TOPIC_LEVEL "tank/level"
 #define MQTT_TOPIC_STATUS "tank/status"

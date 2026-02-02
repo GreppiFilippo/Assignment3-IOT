@@ -14,6 +14,7 @@ class WiFiConnectionService : public NetworkConnectionService
 
     void init() override;
     void connect() override;
+    bool isConnected() override;
 };
 
 #endif  // __WIFI_CONNECTION_SERVICE__
