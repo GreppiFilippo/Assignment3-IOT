@@ -15,6 +15,14 @@ class Button
      * @return false if the button is not pressed
      */
     virtual bool isPressed() = 0;
+    
+    /**
+     * @brief Check if button was just pressed (rising edge).
+     *
+     * @return true if button transitioned from not-pressed to pressed
+     * @return false otherwise
+     */
+    virtual bool wasPressed() = 0;
 };
 
 #endif

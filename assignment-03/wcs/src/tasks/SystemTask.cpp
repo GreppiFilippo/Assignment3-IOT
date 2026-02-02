@@ -24,7 +24,7 @@ void SystemTask::tick() {
         this->pLCD->print(LCD_AUTOMATIC_MODE);
       }
 
-      if (this->pBtn->isPressed()) {
+      if (this->pBtn->wasPressed()) {
         this->pContext->setButtonPressed();
       }
 
@@ -51,10 +51,9 @@ void SystemTask::tick() {
         this->setState(AUTOMATIC);
       }
 
-      if (this->pBtn->isPressed()) {
+      if (this->pBtn->wasPressed()) {
         this->pContext->setButtonPressed();
       }
-
       break;
   }
 }

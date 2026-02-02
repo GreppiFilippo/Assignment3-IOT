@@ -1,6 +1,10 @@
 #ifndef __CONTEXT__
 #define __CONTEXT__
 
+/**
+ * @brief Context class to hold system state
+ *
+ */
 class Context {
  public:
   enum Mode { UNCONNECTED, AUTOMATIC, MANUAL };
@@ -27,6 +31,7 @@ class Context {
 
  private:
   Mode mode;
-  int valveOpening;
+  float valveOpening;
 };
+
 #endif
