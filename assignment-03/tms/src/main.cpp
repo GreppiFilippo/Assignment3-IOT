@@ -1,28 +1,51 @@
-// How to user FreeRTOS to run a task on a specific core of ESP32
-/* void setup() {
-  xTaskCreatePinnedToCore(Task1code, "Task1", 10000, NULL, 1, &Task1,
-                          0);  // run new task in core one
-  delay(500);
-}
+#include <esp32-hal.h>
 
-void loop() {}
-
-void Task1code(void* pvParameters) {
-  for (;;) {
-    Serial.println("Task1 is running on core " + String(xPortGetCoreID()));
-    delay(1000);
-  }
-} */
-
-TaskHandle_t Task1;
+#include "config.hpp"
+#include "devices/Led.hpp"
+#include "devices/Sonar.hpp"
+#include "kernel/Logger.hpp"
+#include "kernel/TaskRunner.hpp"
+#include "kernel/services/MqttService.hpp"
+#include "kernel/services/WiFiConnectionService.hpp"
+#include "model/Context.hpp"
+#include "model/HWPlatform.hpp"
+#include "tasks/NetworkTask.hpp"
+#include "tasks/SensorsTask.hpp"
 
 void setup()
 {
-#ifdef HW_TEST
-// Test code here
-#else
+    Serial.begin(BAUD_RATE);
 
-#endif
+    Context* pContext = new Context();
+
+    HWPlatform* pHWPlatform = new HWPlatform();
+    pHWPlatform->init();
+
+    // ==== NETWORK LAYER INIT ====
+    WiFiConnectionService* pWiFiService = new WiFiConnectionService(WIFI_SSID, WIFI_PASSWORD);
+    pWiFiService->init();
+
+    // ==== PROTOCOL LAYER INIT ====
+    MqttService* pMqttService =
+        new MqttService(pWiFiService, MQTT_BROKER, MQTT_PORT, MQTT_CLIENT_ID);
+    pMqttService->init();
+
+    // ==== TASK INIT ====
+    NetworkTask* pNetworkTask =
+        new NetworkTask(pWiFiService, pMqttService, pHWPlatform->getAliveLight(),
+                        pHWPlatform->getErrorLight(), pContext);
+    pNetworkTask->init();
+
+    SensorsTask* pSensorsTask = new SensorsTask(pContext, pHWPlatform->getProximitySensor());
+    pSensorsTask->init();
+
+    TaskRunner* pNetworkTaskRunner =
+        new TaskRunner(pNetworkTask, "NetworkTask", 4096, 1, pdMS_TO_TICKS(1000), 1);
+
+    TaskRunner* pSensorsTaskRunner = new TaskRunner(pSensorsTask, "SensorsTask", 4096, 1,
+                                                    pdMS_TO_TICKS(SAMPLING_INTERVAL_MS), 1);
+
+    Logger.log(F("TMS: Setup completed."));
 }
 
 void loop() {}

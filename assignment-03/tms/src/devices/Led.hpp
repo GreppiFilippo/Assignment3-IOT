@@ -7,14 +7,15 @@
  * @brief Implementation of an LED device.
  *
  */
-class Led : public Light {
- public:
-  Led(int pin);
-  void switchOn() override;
-  void switchOff() override;
+class Led : public Light
+{
+   public:
+    Led(int pin);
+    void switchOn() override;
+    void switchOff() override;
 
- protected:
-  int pin;
+   protected:
+    int pin;
 };
 
 #endif
