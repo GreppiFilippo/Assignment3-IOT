@@ -10,6 +10,8 @@
 #include "tasks/TestHWTask.hpp"
 #include "tasks/ValveTask.hpp"
 
+#define __TESTING_HW__
+
 // Comment out to run hardware testing task
 // #define __TESTING_HW__
 

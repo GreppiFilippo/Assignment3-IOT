@@ -11,10 +11,15 @@
 #define LCD_AUTOMATIC_MODE "Automatic Mode"
 #define LCD_MANUAL_MODE "Manual Mode"
 #define LCD_UNCONNECTED "Unconnected"
-#define BAUD_RATE 11500
+#define BAUD_RATE 115200
 
 #define SCHED_BASE_PERIOD 50
 #define CONNECTION_TASK_PERIOD 500
 #define SYSTEM_TASK_PERIOD 200
 #define VALVE_TASK_PERIOD 100
-#endif
+#define VALVE_MAX_ANGLE 90
+#define VALVE_MIN_ANGLE 0
+
+#define MSEC_PER_PERCENT 6
+
+#endif  // __CONFIG__

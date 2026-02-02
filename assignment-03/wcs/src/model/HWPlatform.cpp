@@ -27,6 +27,8 @@ Button* HWPlatform::getButton() { return this->pButton; }
 
 void HWPlatform::test() {
   this->pLCD->print("Testing Servo Motor...");
+  this->pServo->on();
+  delay(1000);
   this->pServo->setPosition(0);
   delay(1000);
   this->pServo->setPosition(90);
