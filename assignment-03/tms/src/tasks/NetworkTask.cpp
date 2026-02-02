@@ -1,18 +1,18 @@
 #include "NetworkTask.hpp"
 
-#include <ArduinoJson.h>
 #include <esp32-hal.h>
 
-#include <kernel/Logger.hpp>
-
 #include "config.hpp"
+#include "kernel/Logger.hpp"
 
-#define T (1 / SAMPLING_INTERVAL_MS)
+#define T (SAMPLING_INTERVAL_MS)
 
-NetworkTask::NetworkTask(ConnectionService* pConnectionService, Light* pAliveLight,
-                         Light* pErrorLight, Context* pContext)
+NetworkTask::NetworkTask(NetworkConnectionService* pNetworkService,
+                         ProtocolService* pProtocolService, Light* pAliveLight, Light* pErrorLight,
+                         Context* pContext)
 {
-    this->pConnectionService = pConnectionService;
+    this->pNetworkService = pNetworkService;
+    this->pProtocolService = pProtocolService;
     this->pAliveLight = pAliveLight;
     this->pErrorLight = pErrorLight;
     this->pContext = pContext;
@@ -23,30 +23,42 @@ void NetworkTask::init() { this->lastSentTime = 0; }
 
 void NetworkTask::tick()
 {
+    // Always call protocol loop for keep-alive and message processing
+    this->pProtocolService->loop();
+
     switch (this->state)
     {
         case CONNECTING:
             if (this->checkAndSetJustEntered())
             {
-                Logger.log(F("[NT] CONNECTING\n"));
+                Logger.log(F("[NT] CONNECTING"));
             }
 
-            this->pConnectionService->connect();
-            if (this->pConnectionService->isConnected())
+            // Connect network layer first
+            this->pNetworkService->connect();
+
+            // Then connect protocol layer
+            if (this->pNetworkService->isConnected())
             {
-                this->setState(NETWORK_OK);
+                this->pProtocolService->connect();
+
+                if (this->pProtocolService->isConnected())
+                {
+                    this->setState(NETWORK_OK);
+                }
             }
             break;
         case NETWORK_OK:
             if (this->checkAndSetJustEntered())
             {
-                Logger.log(F("[NT] NETWORK_OK\n"));
+                Logger.log(F("[NT] NETWORK_OK"));
 
                 this->pAliveLight->switchOn();
                 this->pErrorLight->switchOff();
             }
 
-            if (!this->pConnectionService->isConnected())  // lost connection
+            // Check both layers
+            if (!this->pNetworkService->isConnected() || !this->pProtocolService->isConnected())
             {
                 this->setState(NETWORK_ERROR);
             }
@@ -60,17 +72,23 @@ void NetworkTask::tick()
         case NETWORK_ERROR:
             if (this->checkAndSetJustEntered())
             {
-                Logger.log(F("[NT] NETWORK_ERROR\n"));
+                Logger.log(F("[NT] NETWORK_ERROR"));
 
                 this->pAliveLight->switchOff();
                 this->pErrorLight->switchOn();
             }
 
-            this->pConnectionService->connect();
+            // Try to reconnect both layers
+            this->pNetworkService->connect();
 
-            if (this->pConnectionService->isConnected())
+            if (this->pNetworkService->isConnected())
             {
-                this->setState(NETWORK_OK);
+                this->pProtocolService->connect();
+
+                if (this->pProtocolService->isConnected())
+                {
+                    this->setState(NETWORK_OK);
+                }
             }
             break;
         default:
@@ -97,19 +115,38 @@ bool NetworkTask::checkAndSetJustEntered()
 
 void NetworkTask::sendData()
 {
-    // TODO: implement data sending logic using pConnectionService and pContext
-    StaticJsonDocument<SENDING_BUFFER_SIZE> doc;
-    // Populate the JSON document with data from pContext
-    // Serialize JSON to string and send it via pConnectionService
-    this->pContext->populateJsonDocument(doc);
-    char buffer[SENDING_BUFFER_SIZE];
-    size_t n = serializeJson(doc, buffer, sizeof(buffer));
-    if (n > 0)
+    if (!this->pProtocolService->isConnected())
     {
-        this->pConnectionService->send(buffer, n);
+        return;
     }
-    else
+
+    int msgCount = this->pContext->getMessageCount();
+    if (msgCount == 0)
     {
-        Logger.log(F("[NT] Error sending data\n"));
+        return;  // Nothing to send
+    }
+
+    Message** msgs = this->pContext->getMessages();
+    int sentCount = 0;
+    
+    for (int i = 0; msgs[i] != nullptr; i++)
+    {
+        if (this->pProtocolService->send(msgs[i]))
+        {
+            Logger.log(String("[NT] Sent message: topic=") + String(msgs[i]->topic) + 
+                      String(" payload=") + String(msgs[i]->payload));
+            sentCount++;
+        }
+        else
+        {
+            Logger.log(String("[NT] Failed to send message: topic=") + String(msgs[i]->topic));
+        }
+    }
+
+    // Clear sent messages
+    if (sentCount > 0)
+    {
+        this->pContext->clearMessages();
+        Logger.log(String("[NT] Cleared ") + String(sentCount) + String(" messages"));
     }
 }

@@ -4,13 +4,15 @@
 #include <devices/Light.hpp>
 
 #include "kernel/Task.hpp"
-#include "kernel/services/ConnectionService.hpp"
+#include "kernel/services/NetworkConnectionService.hpp"
+#include "kernel/services/ProtocolService.hpp"
 #include "model/Context.hpp"
 
 class NetworkTask : public Task
 {
    private:
-    ConnectionService* pConnectionService;
+    NetworkConnectionService* pNetworkService;
+    ProtocolService* pProtocolService;
     Context* pContext;
     Light* pAliveLight;
     Light* pErrorLight;
@@ -37,11 +39,14 @@ class NetworkTask : public Task
     /**
      * @brief Construct a new Network Task object
      *
-     * @param pConnectionService the connection service
+     * @param pNetworkService the network connection service
+     * @param pProtocolService the protocol service
+     * @param pAliveLight the alive light
+     * @param pErrorLight the error light
      * @param pContext the context
      */
-    NetworkTask(ConnectionService* pConnectionService, Light* pAliveLight, Light* pErrorLight,
-                Context* pContext);
+    NetworkTask(NetworkConnectionService* pNetworkService, ProtocolService* pProtocolService,
+                Light* pAliveLight, Light* pErrorLight, Context* pContext);
     void init() override;
     void tick() override;
 

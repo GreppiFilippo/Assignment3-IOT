@@ -1,5 +1,7 @@
 #include "Logger.hpp"
 
+LoggerService Logger;
+
 void LoggerService::log(const String& msg)
 {
     Serial.print("lo:");

@@ -23,8 +23,8 @@
 /***********************
  * WIFI CONFIGURATION
  ***********************/
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
 
 /***********************
  * MQTT CONFIGURATION

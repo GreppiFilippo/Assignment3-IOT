@@ -2,28 +2,26 @@
 #define __MQTT_SERVICE__
 
 #include <PubSubClient.h>
-#include <WiFiClient.h>
 
-#include "kernel/services/ConnectionService.hpp"
+#include "kernel/services/ProtocolService.hpp"
 
-#define MAX_MQTT_TOPICS 5
-
-class MqttService : public ConnectionService
+class MqttService : public ProtocolService
 {
    private:
     const char* broker;
     int port;
     const char* clientId;
-    const char* topics[MAX_MQTT_TOPICS];
-    PubSubClient* mqttClient;
-    WiFiClient* espClient;
+
+    PubSubClient mqttClient;
 
    public:
-    MqttService(const char* broker, int port, const char* clientId);
+    MqttService(NetworkConnectionService* networkService, const char* broker, int port,
+                const char* clientId);
+
     void init() override;
     void connect() override;
-    void send(const char* data, size_t length);
-    void setTopic(const char* topic);
+    bool send(Message* msg) override;
+    void loop() override;
 };
 
-#endif  // __MQTT_SERVICE__
+#endif
