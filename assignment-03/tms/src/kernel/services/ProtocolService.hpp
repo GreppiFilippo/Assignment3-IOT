@@ -14,7 +14,7 @@ class ProtocolService
    protected:
     bool connected = false;
     NetworkConnectionService* networkService;
-
+    
    public:
     /**
      * @brief Initialize the protocol service.
