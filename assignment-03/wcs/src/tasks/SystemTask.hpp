@@ -1,24 +1,27 @@
+#include "devices/Button.hpp"
+#include "devices/LCD.hpp"
+#include "devices/Potentiometer.hpp"
 #include "kernel/Task.hpp"
 #include "model/Context.hpp"
-#include "devices/LCD.hpp"
-#include "devices/Button.hpp"
-
 
 class SystemTask : public Task {
-    private: 
-        Context* pContext;
-        LCD* pLCD;
-        Button* pBtn;
+ private:
+  Context* pContext;
+  LCD* pLCD;
+  Button* pBtn;
+  Potentiometer* pPot;
 
-        enum State {
-            EVALUATING,
-            AUTOMATIC,
-            MANUAL
-        } state;
+  enum State { EVALUATING, AUTOMATIC, MANUAL } state;
 
-        bool justEntered;
+  bool justEntered;
+  unsigned long stateTimestamp;
 
-    public:
-        void tick() override;
-        void setState(State s);
+ public:
+  SystemTask(Context* context, LCD* lcd, Button* btn, Potentiometer* pot);
+  void tick() override;
+  void setState(State s);
+
+ private:
+  long elapsedTimeInState();
+  bool checkAndSetJustEntered();
 };
