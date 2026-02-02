@@ -7,7 +7,6 @@
 class SystemTask : public Task {
  private:
   Context* pContext;
-  LCD* pLCD;
   Button* pBtn;
   Potentiometer* pPot;
 
@@ -17,7 +16,7 @@ class SystemTask : public Task {
   unsigned long stateTimestamp;
 
  public:
-  SystemTask(Context* context, LCD* lcd, Button* btn, Potentiometer* pot);
+  SystemTask(Context* context, Button* btn, Potentiometer* pot);
   void tick() override;
 
  private:
