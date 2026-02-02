@@ -46,11 +46,9 @@ void NetworkTask::tick()
                 {
                     this->setState(NETWORK_OK);
                 } else {
-                    Logger.log(F("AAAA"));
                     this->setState(NETWORK_ERROR);
                 }
             } else {
-                Logger.log(F("BBBB"));
                 this->setState(NETWORK_ERROR);
             }
             break;
@@ -58,7 +56,6 @@ void NetworkTask::tick()
             if (this->checkAndSetJustEntered())
             {
                 Logger.log(F("[NT] NETWORK_OK"));
-
                 this->pAliveLight->switchOn();
                 this->pErrorLight->switchOff();
             }

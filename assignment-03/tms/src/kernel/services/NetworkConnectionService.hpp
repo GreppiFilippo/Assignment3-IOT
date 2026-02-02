@@ -8,7 +8,7 @@
  */
 class NetworkConnectionService
 {
-
+    
    public:
     /**
      * @brief Initialize the network connection.
