@@ -21,9 +21,15 @@
 #define SAMPLING_INTERVAL_MS 1000  // intervallo di campionamento in millisecondi
 
 /***********************
+ * WIFI CONFIGURATION
+ ***********************/
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+/***********************
  * MQTT CONFIGURATION
  ***********************/
-#define MQTT_BROKER "192.168.1.100"
+#define MQTT_BROKER "broker.hivemq.com"
 #define MQTT_PORT 1883
 #define MQTT_TOPIC_LEVEL "tank/level"
 #define MQTT_TOPIC_STATUS "tank/status"
@@ -38,23 +44,9 @@
 #define TIME_T2 10000  // ms, timeout rete prima di entrare in UNCONNECTED
 
 /***********************
- * LED STATES
- ***********************/
-#define HIGH
-#define LOW
-
-/***********************
- * FSM STATES
- ***********************/
-#define STATE_INIT 0
-#define STATE_AUTOMATIC 1
-#define STATE_MANUAL 2
-#define STATE_ERROR 3
-
-/***********************
  * SERIAL CONFIGURATION
  ***********************/
-#define BAUD 115200
+#define BAUD_RATE 115200
 
 #define SENDING_BUFFER_SIZE 256
 
