@@ -1,13 +1,13 @@
 #ifndef __SENSORS_TASK_HPP__
 #define __SENSORS_TASK_HPP__
 
-#include "model/Context.hpp"
 #include "devices/ProximitySensor.hpp"
 #include "kernel/Task.hpp"
+#include "model/Context.hpp"
 
 class SensorsTask : public Task
 {
-private:
+   private:
     Context* pContext;
     ProximitySensor* pSonar;
     float level;
@@ -18,9 +18,10 @@ private:
     void measureLevel();
     long elapsedTimeInState();
     bool checkAndSetJustEntered();
-public:
+
+   public:
     SensorsTask(Context* context, ProximitySensor* sonar);
     void tick() override;
 };
 
-#endif // __SENSORS_TASK_HPP__
+#endif  // __SENSORS_TASK_HPP__
