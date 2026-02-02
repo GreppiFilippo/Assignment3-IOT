@@ -6,7 +6,10 @@
 
 MqttService::MqttService(NetworkConnectionService* networkService, const char* broker, int port,
                          const char* clientId)
-    : broker(broker), port(port), clientId(clientId)
+    : mqttClient(espClient), 
+      broker(broker), 
+      port(port), 
+      clientId(clientId)
 {
     this->networkService = networkService;
 }

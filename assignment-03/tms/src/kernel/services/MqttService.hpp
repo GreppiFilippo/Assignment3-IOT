@@ -2,6 +2,7 @@
 #define __MQTT_SERVICE__
 
 #include <PubSubClient.h>
+#include <WiFi.h>
 
 #include "kernel/services/ProtocolService.hpp"
 
@@ -11,6 +12,7 @@ class MqttService : public ProtocolService
     const char* broker;
     int port;
     const char* clientId;
+    WiFiClient espClient;
 
     PubSubClient mqttClient;
 

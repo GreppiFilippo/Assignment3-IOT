@@ -8,8 +8,6 @@
  */
 class NetworkConnectionService
 {
-   protected:
-    bool connected = false;
 
    public:
     /**
@@ -28,7 +26,7 @@ class NetworkConnectionService
      * @return true if connected
      * @return false if not connected
      */
-    bool isConnected() { return connected; }
+    virtual bool isConnected() = 0;
 };
 
 #endif  // __NETWORK_CONNECTION_SERVICE__

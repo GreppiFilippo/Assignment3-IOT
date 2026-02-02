@@ -36,7 +36,7 @@ void NetworkTask::tick()
 
             // Connect network layer first
             this->pNetworkService->connect();
-
+            
             // Then connect protocol layer
             if (this->pNetworkService->isConnected())
             {
@@ -45,7 +45,13 @@ void NetworkTask::tick()
                 if (this->pProtocolService->isConnected())
                 {
                     this->setState(NETWORK_OK);
+                } else {
+                    Logger.log(F("AAAA"));
+                    this->setState(NETWORK_ERROR);
                 }
+            } else {
+                Logger.log(F("BBBB"));
+                this->setState(NETWORK_ERROR);
             }
             break;
         case NETWORK_OK:

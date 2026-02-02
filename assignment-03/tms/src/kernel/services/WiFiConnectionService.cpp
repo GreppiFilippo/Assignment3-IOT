@@ -14,29 +14,46 @@ void WiFiConnectionService::init()
     WiFi.mode(WIFI_STA);
     Logger.log(F("[WiFi] Initialized"));
 }
-
 void WiFiConnectionService::connect()
 {
-    if (WiFi.status() == WL_CONNECTED)
+    wl_status_t status = WiFi.status();
+
+    // 1. Se è già connesso, non fare nulla
+    if (status == WL_CONNECTED)
     {
-        connected = true;
+            Logger.log(F("[WiFi] Connected"));
+            Logger.log(String("[WiFi] IP: ") + WiFi.localIP().toString());
         return;
     }
 
-    if (WiFi.status() == WL_IDLE_STATUS)
+    // 2. Se arriviamo qui, non siamo connessi. Proviamo a connetterci.
+    Logger.log(F("[WiFi] Connecting"));
+    
+    // Avviamo il tentativo
+    WiFi.begin(ssid, password);
+
+    // 3. ASPETTIAMO FINO A 5 SECONDI (5*1000ms) è il tempo perché l'esp si connetta
+    int maxAttempts = 5; 
+    for(int i = 0; i < maxAttempts; i++)
     {
-        Logger.log(F("[WiFi] Connecting..."));
-        WiFi.begin(ssid, password);
+        status = WiFi.status();
+        if (status == WL_CONNECTED)
+        {
+            Logger.log(F("[WiFi] Connected"));
+            Logger.log(String("[WiFi] IP: ") + WiFi.localIP().toString());
+            return; 
+        }
+        delay(1000); 
+        // Opzionale: stampa un puntino sulla seriale per vedere che non è bloccato
+        Logger.log("[WiFi] Attempt " + String(i + 1) + "/" + String(maxAttempts)); 
     }
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Logger.log(F("[WiFi] Connected"));
-        Logger.log(String("[WiFi] IP: ") + WiFi.localIP().toString());
-        connected = true;
-    }
-    else
-    {
-        connected = false;
-    }
+    // 4. Se dopo 5 secondi non è successo nulla
+    Serial.println(""); 
+    Logger.log(F("[WiFi] Connection timed out after 5s"));
+}
+
+bool WiFiConnectionService::isConnected()
+{
+    return WiFi.status() == WL_CONNECTED;
 }
