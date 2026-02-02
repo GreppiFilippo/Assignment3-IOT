@@ -1,15 +1,21 @@
+#include "devices/ServoMotor.hpp"
 #include "kernel/Task.hpp"
 #include "model/Context.hpp"
 
 class ValveTask : public Task {
-    private:
-        Context* pContext;
+ private:
+  Context* pContext;
+  ServoMotor* pServo;
 
-        enum State {
-            IDLE,
-            ADJUSTING,
-        };
+  enum State {
+    IDLE,
+    ADJUSTING,
+  };
 
-        void adjustValve();
-        bool inPosition();
+  void adjustValve();
+  bool inPosition();
+
+ public:
+  ValveTask(Context* context, ServoMotor* servo);
+  void tick() override;
 };

@@ -3,6 +3,11 @@
 
 class Potentiometer {
  public:
+  /**
+   * @brief Construct a new Potentiometer object
+   *
+   * @param pin Analog pin connected to the potentiometer
+   */
   Potentiometer(int pin);
 
   float getValue();

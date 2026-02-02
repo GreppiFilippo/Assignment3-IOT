@@ -1,16 +1,20 @@
-#include "model/Context.hpp"
 #include "kernel/MsgService.hpp"
+#include "model/Context.hpp"
 
-class ConnectionTask {
-    private:
-        Context* pContext;
-        MsgServiceClass* pMsgService;
-        
-        enum State {
-            UNCONNECTED,
-            CONNECTED,
-        };
-        
-        void receive();
-        void send();
+class ConnectionTask : public Task {
+ private:
+  Context* pContext;
+  MsgServiceClass* pMsgService;
+
+  enum State {
+    UNCONNECTED,
+    CONNECTED,
+  };
+
+  void receive();
+  void send();
+
+ public:
+  ConnectionTask(Context* context, MsgServiceClass* msgService);
+  void tick() override;
 };
