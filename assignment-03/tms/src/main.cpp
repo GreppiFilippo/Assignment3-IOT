@@ -12,13 +12,16 @@
 #include "tasks/NetworkTask.hpp"
 #include "tasks/SensorsTask.hpp"
 
+Context* pContext;
+HWPlatform* pHWPlatform;
+
 void setup()
 {
     Serial.begin(BAUD_RATE);
 
-    Context* pContext = new Context();
+    pContext = new Context();
 
-    HWPlatform* pHWPlatform = new HWPlatform();
+    pHWPlatform = new HWPlatform();
     pHWPlatform->init();
 
     // ==== NETWORK LAYER INIT ====

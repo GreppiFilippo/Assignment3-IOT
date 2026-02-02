@@ -57,3 +57,8 @@ bool WiFiConnectionService::isConnected()
 {
     return WiFi.status() == WL_CONNECTED;
 }
+
+Client* WiFiConnectionService::getClient()
+{
+    return &wifiClient;
+}

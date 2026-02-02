@@ -1,6 +1,8 @@
 #ifndef __NETWORK_CONNECTION_SERVICE__
 #define __NETWORK_CONNECTION_SERVICE__
 
+#include <Client.h>
+
 /**
  * @brief Service for managing physical network connections (WiFi, Ethernet, LoRa, etc.).
  *
@@ -27,6 +29,13 @@ class NetworkConnectionService
      * @return false if not connected
      */
     virtual bool isConnected() = 0;
+
+    /**
+     * @brief Get the Client instance for this network connection.
+     *
+     * @return Client* pointer to the client instance
+     */
+    virtual Client* getClient() = 0;
 };
 
 #endif  // __NETWORK_CONNECTION_SERVICE__
