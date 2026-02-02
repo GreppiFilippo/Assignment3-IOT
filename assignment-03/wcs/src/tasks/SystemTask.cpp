@@ -6,11 +6,15 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
   this->pContext = context;
   this->pBtn = btn;
   this->pPot = pot;
+  this->setState(UNCONNECTED);
 }
 
 void SystemTask::tick() {
   switch (this->state) {
-    case EVALUATING:
+    case UNCONNECTED:
+      if (this->checkAndSetJustEntered()) {
+        this->pContext->setLCDMessage(LCD_UNCONNECTED);
+      }
       if (this->pContext->getMode() == Context::AUTOMATIC) {
         this->setState(AUTOMATIC);
       } else if (this->pContext->getMode() == Context::MANUAL) {
@@ -27,7 +31,7 @@ void SystemTask::tick() {
       }
 
       if (!this->pContext->isConnected()) {
-        this->setState(EVALUATING);
+        this->setState(UNCONNECTED);
       }
 
       if (this->pContext->getMode() == Context::MANUAL) {
