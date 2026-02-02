@@ -9,15 +9,15 @@ class Context
 {
    private:
     float waterLevel;
-    
+
     Message pendingMessages[MAX_PENDING_MESSAGES];
     int messageCount;
 
    public:
     Context();
-    void setWaterLevel(float level);
+    void setWaterLevel(float level, unsigned long timestamp);
     float getWaterLevel() const;
-    
+
     // Message queue management
     void addMessage(const char* topic, const char* payload);
     Message** getMessages();

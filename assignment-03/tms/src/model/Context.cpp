@@ -10,13 +10,14 @@ Context::Context()
     this->messageCount = 0;
 }
 
-void Context::setWaterLevel(float level)
+void Context::setWaterLevel(float level, unsigned long timestamp)
 {
     this->waterLevel = level;
 
-    // Create a message for the level update
+    // Costruzione JSON
     char payload[PAYLOAD_SIZE];
-    dtostrf(level, 6, 2, payload);
+    snprintf(payload, PAYLOAD_SIZE, "{\"level\":%.2f,\"timestamp\":%lu}", level, timestamp);
+
     addMessage(MQTT_TOPIC_LEVEL, payload);
 }
 

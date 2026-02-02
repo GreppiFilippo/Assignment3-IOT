@@ -1,7 +1,7 @@
 #ifndef __MESSAGE__
 #define __MESSAGE__
 
-#define PAYLOAD_SIZE 32
+#define PAYLOAD_SIZE 64
 
 typedef struct Message
 {
