@@ -29,6 +29,9 @@ class Context {
   void setValveOpening(float opening);
   void setMode(Mode mode);
 
+  const char* getLCDMessage() const;
+  void setLCDMessage(const char* msg);
+
  private:
   Mode mode;
   float valveOpening;

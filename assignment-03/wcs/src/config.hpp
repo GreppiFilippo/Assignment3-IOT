@@ -8,13 +8,16 @@
 #define LCD_ROWS 4
 #define BUTTON_PIN 7
 
-#define LCD_AUTOMATIC_MODE "Automatic Mode"
-#define LCD_MANUAL_MODE "Manual Mode"
-#define LCD_UNCONNECTED "Unconnected"
+#define LCD_AUTOMATIC_MODE "AUTOMATIC"
+#define LCD_MANUAL_MODE "MANUAL"
+#define LCD_UNCONNECTED "UNCONNECTED"
+
 #define BAUD_RATE 11500
 
 #define SCHED_BASE_PERIOD 50
 #define CONNECTION_TASK_PERIOD 500
 #define SYSTEM_TASK_PERIOD 200
 #define VALVE_TASK_PERIOD 100
+#define LCD_TASK_PERIOD 1000
+
 #endif

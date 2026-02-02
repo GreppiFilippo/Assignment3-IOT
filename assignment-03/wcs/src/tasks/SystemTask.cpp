@@ -2,10 +2,8 @@
 
 #include "config.hpp"
 
-SystemTask::SystemTask(Context* context, LCD* lcd, Button* btn,
-                       Potentiometer* pot) {
+SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
   this->pContext = context;
-  this->pLCD = lcd;
   this->pBtn = btn;
   this->pPot = pot;
 }
@@ -21,7 +19,7 @@ void SystemTask::tick() {
       break;
     case AUTOMATIC:
       if (this->checkAndSetJustEntered()) {
-        this->pLCD->print(LCD_AUTOMATIC_MODE);
+        this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
       }
 
       if (this->pBtn->wasPressed()) {
@@ -40,7 +38,7 @@ void SystemTask::tick() {
     case MANUAL:
 
       if (this->checkAndSetJustEntered()) {
-        this->pLCD->print(LCD_MANUAL_MODE);
+        this->pContext->setLCDMessage(LCD_MANUAL_MODE);
       }
 
       this->pPot->sync();
