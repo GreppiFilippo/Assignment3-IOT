@@ -1,18 +1,13 @@
-#include <Arduino.h>
-#include <esp32-hal.h>
-
 #include "Logger.hpp"
-#include "config.hpp"
 
-Logger& Logger::instance() {
-  static Logger inst;
-  return inst;
+void LoggerService::log(const String& msg)
+{
+    Serial.print("lo:");
+    Serial.println(msg);
 }
 
-Logger::Logger() {
-  Serial.begin(BAUD);
-  while (!Serial) {
-  }
+void LoggerService::log(const __FlashStringHelper* msg)
+{
+    Serial.print(F("lo:"));
+    Serial.println(msg);
 }
-
-void Logger::log(const char* message) { Serial.println(message); }
