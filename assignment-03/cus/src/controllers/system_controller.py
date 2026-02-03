@@ -1,9 +1,11 @@
+import asyncio
 import json
 from datetime import datetime
 from pydantic import ValidationError
-from typing import List
-from services.base_service import BaseService
-from services.event_bus import EventBus
+from services.event_dispatcher import EventDispatcher
+from services.mqtt_service import MQTTService
+from services.serial_service import SerialService
+from services.http_service import HttpService
 from models.system_model import SystemModel
 from models.schemas import LevelReading, TankLevelPayload
 from utils.logger import get_logger
@@ -23,102 +25,76 @@ class SystemController(BaseController):
     """
     System controller implementing business logic for Smart Tank Monitoring.
     
-    Transport-agnostic: communicates via EventBus only, never directly with services.
-    Services can be swapped (Serial ↔ MQTT) without changing controller logic.
+    Configures MQTT, Serial, and HTTP services with specific handlers
+    for water level monitoring and valve control.
     """
 
     def __init__(
         self,
         model: SystemModel,
-        services: List[BaseService]
+        mqtt_service: MQTTService,
+        serial_service: SerialService,
+        http_service: HttpService,
+        event_dispatcher: EventDispatcher
     ):
         """
-        Initialize system controller.
+        Initialize system controller with specific services.
         
         Args:
-            model: System model for state management
-            services: List of services to manage (transport-agnostic)
+            mqtt_service: MQTT service for receiving water level data
+            serial_service: Serial service for communicating with WCS
+            http_service: HTTP service for REST API
+            event_dispatcher: Event dispatcher for inter-service communication
         """
         # Initialize base model
         self._model = model
+
+        # Store service references for direct access
+        self._mqtt_service = mqtt_service
+
+        self._mqtt_service.register_payload_handler(self._on_tank_level)
+
+
+        self._serial_service = serial_service
+
+        self._serial_service.register_handler(self.msg_from_serial)
+        self._http_service = http_service
         
-        # Initialize base controller with services list (no event_dispatcher)
-        super().__init__(services=services, event_dispatcher=None)
-        
-        # Subscribe to domain events (input) using EventBus
-        EventBus.subscribe("tank.level", self._on_tank_level_event)
-        EventBus.subscribe("wcs.status", self._on_wcs_status_event)
-        
-        logger.info("SystemController initialized with PyPubSub EventBus")
+        # Initialize base controller with services list
+        super().__init__(
+            services=[mqtt_service, serial_service, http_service],
+            event_dispatcher=event_dispatcher
+        )
 
     async def _on_start(self) -> None:
-        """Hook called before services start."""
-        logger.info("SystemController started - transport agnostic mode")
-        
+        pass
     async def _on_stop(self) -> None:
-        """Hook called before services stop."""
         pass
     
-    # ============ INPUT: Domain Events (from services) ============
-    
-    async def _on_tank_level_event(self, level: str) -> None:
-        """
-        Handle tank level updates (transport-agnostic).
-        Level can come from MQTT, Serial, HTTP, etc.
-        
-        Args:
-            level: Water level data (string: JSON or plain text)
-        """
-        self._process_tank_level(level)
-    
-    async def _on_wcs_status_event(self, data: dict) -> None:
-        """
-        Handle WCS status updates (valve position confirmations, etc.)
-        
-        Args:
-            data: WCS status data dictionary
-        """
-        logger.info(f"WCS status: {data}")
-        # TODO: Update model with valve position, system state, etc.
 
-    # ============ Business Logic ============
-    
-    def _process_tank_level(self, payload: str) -> None:
+    def _on_tank_level(self, payload: str) -> None:
         """
-        Process tank level reading and trigger actions.
-        Content-agnostic: handles JSON dict, JSON number, or plain text.
+        Handle incoming water level data from MQTT.
+        Content-agnostic: handles both JSON and plain text formats.
         
         Args:
-            payload: Water level data (any format)
+            payload: Raw MQTT payload string
         """
         try:
-            # Try JSON format first
+            # Try JSON format first: {"level": 45.23, "timestamp": 1234567890}
             data = json.loads(payload)
-            
-            # Check if it's a dict with level/timestamp or just a number
-            if isinstance(data, dict):
-                # JSON object format: {"level": 45.23, "timestamp": 1234567890}
-                validated = TankLevelPayload(**data)
-                logger.info(f"Received water level: {validated.level}, timestamp: {validated.to_datetime()}")
-                self._model.add_level_reading(
-                    LevelReading(water_level=validated.level, timestamp=validated.to_datetime())
-                )
-            elif isinstance(data, (int, float)):
-                # JSON number format: 45.23
-                timestamp = datetime.now()
-                logger.info(f"Received water level (JSON number): {data}, using current time")
-                self._model.add_level_reading(
-                    LevelReading(water_level=float(data), timestamp=timestamp)
-                )
-            else:
-                logger.error(f"Unexpected JSON type: {type(data)}")
+            validated = TankLevelPayload(**data)
+            logger.info(f"Received water level: {validated.level}, timestamp: {validated.to_datetime()}")
+            self._model.add_level_reading(
+                LevelReading(water_level=validated.level, timestamp=validated.to_datetime())
+            )
             
         except json.JSONDecodeError:
             # Plain text format: just the level value
             try:
                 level = float(payload.strip())
                 timestamp = datetime.now()
-                logger.info(f"Received water level (plain text): {level}, using current time")
+                logger.info(f"Received water level (plain): {level}, using current time")
                 self._model.add_level_reading(
                     LevelReading(water_level=level, timestamp=timestamp)
                 )
@@ -130,32 +106,12 @@ class SystemController(BaseController):
         except Exception as e:
             logger.exception(f"Failed to process tank level: {e}")
 
-    # ============ OUTPUT: Command Events (to services) ============
-    
-    async def _set_valve_position(self, position: float) -> None:
+    def msg_from_serial(self, data: dict) -> None:
         """
-        Command: Set valve position.
-        Transport-agnostic - any service can handle this.
+        Handle incoming messages from Serial service.
         
         Args:
-            position: Valve position percentage (0-100)
+            data: Parsed data dictionary from serial input
         """
-        logger.info(f"Controller command: set valve to {position}%")
-        await EventBus.publish("valve.set", position=position)
-    
-    async def _set_alarm(self, active: bool) -> None:
-        """
-        Command: Set alarm state.
+        logger.debug(f"Processing serial data: {data}")
         
-        Args:
-            active: True to activate alarm, False to deactivate
-        """
-        logger.info(f"Controller command: set alarm {'ON' if active else 'OFF'}")
-        await EventBus.publish("alarm.set", active=active)
-    
-    async def _request_system_status(self) -> None:
-        """
-        Command: Request current system status from WCS.
-        """
-        logger.debug("Controller command: request system status")
-        await EventBus.publish("system.status.request")
