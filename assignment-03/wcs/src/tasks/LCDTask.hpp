@@ -18,6 +18,7 @@ class LCDTask : public Task {
  private:
   Context* pContext;
   LCD* lcd;
+  float lastValvePos;
   char lastMsg[LCD_BUFFER_SIZE];
 
  public:
