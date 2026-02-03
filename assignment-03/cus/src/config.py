@@ -3,7 +3,12 @@
 # === MQTT Configuration ===
 MQTT_BROKER_HOST = "broker.mqtt-dashboard.com"
 MQTT_BROKER_PORT = 1883
-MQTT_TOPIC = "tank/level"
+LEVEL_IN_TOPIC = "level_in"
+LEVEL_OUT_TOPIC = "level_out"
+REQUESTED_OPENING = "requested_opening"
+MODE_CHANGE = "mode_change"
+OPENING = "opening"
+
 
 # === Serial Configuration ===
 SERIAL_PORT = "COM3"  # Change to "/dev/ttyUSB0" on Linux/Mac
