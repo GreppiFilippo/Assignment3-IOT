@@ -34,8 +34,8 @@ class SystemModel:
     def get_level_readings(self) -> list[LevelReading]:
         return list(self._level_reading)
 
-    def get_last_level_reading(self) -> Optional[LevelReading]:
-        return self._level_reading[-1] if self._level_reading else None
+    def get_readings(self) -> Optional[LevelReading]:
+        return self._level_reading.copy()
 
     def erase_level_readings(self, from_index: int = 0, to_index: Optional[int] = None):
         self._level_reading = deque(list(self._level_reading)[from_index:to_index], maxlen=self._level_reading.maxlen)

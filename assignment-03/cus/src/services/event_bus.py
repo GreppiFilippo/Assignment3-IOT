@@ -7,7 +7,7 @@ Uses PyPubSub library for robust signal dispatching.
 
 import asyncio
 from typing import Callable, Any
-from pubsub import pub
+from pypubsub import pub
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

@@ -6,23 +6,24 @@ from services.mqtt_service import MQTTService
 from services.serial_service import SerialService
 from services.http_service import HttpService
 import config
-
+from services.event_bus import EventBus
+from controllers.orchestrator import Orchestrator
 
 # Setup logging
 setup_logging(log_level=config.LOG_LEVEL, log_file=config.LOG_FILE)
 logger = get_logger(__name__)
 
-
+status = 0
 async def main():
     logger.info("Initializing CUS application with PyPubSub EventBus")
-
+    event_bus = EventBus()
     model = SystemModel()
 
+    
     # Create services (no event_dispatcher needed - using EventBus)
     mqtt_service = MQTTService(
         broker=config.MQTT_BROKER_HOST,
-        port=config.MQTT_BROKER_PORT,
-        topics=config.MQTT_TOPIC
+        port=config.MQTT_BROKER_PORT
     )
 
     serial_service = SerialService(
@@ -34,6 +35,19 @@ async def main():
         host=config.HTTP_HOST,
         port=config.HTTP_PORT
     )
+
+    orchestrator = Orchestrator(
+        event_bus=event_bus
+    )
+
+    event_bus.subscribe(config.LEVEL_OUT_TOPIC, setstatus)
+    event_bus.subscribe(config.REQUESTED_OPENING, orchestrator.handle_req_opening)
+    event_bus.subscribe(config.MODE_CHANGE, orchestrator.handle_mode_change)
+    event_bus.subscribe(config.LEVEL_IN_TOPIC, orchestrator.handle_new_measurement)
+
+    event_bus.subscribe(config.MODE, serial_service.store_new_mode)
+    event_bus.subscribe(config.OPENING, serial_service.store_new_opening)
+    
 
     # Create controller (transport-agnostic)
     services = [mqtt_service, serial_service, http_service]
@@ -58,3 +72,10 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Shutdown requested")
+
+def getStatus():
+    return status
+
+def setstatus(s):
+    global status
+    status = s
