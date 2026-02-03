@@ -21,6 +21,8 @@
 #define VALVE_MAX_ANGLE 90
 #define VALVE_MIN_ANGLE 0
 #define MSEC_PER_PERCENT 6
+#define MODE_LINE 0
+#define VALVE_LINE 1
 
 #define LCD_TASK_PERIOD 1000
 
