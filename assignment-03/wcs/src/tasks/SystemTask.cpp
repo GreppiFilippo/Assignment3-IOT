@@ -20,8 +20,8 @@ void SystemTask::tick() {
   // Read potentiometer and update Context
   this->pPot->sync();
   float potValue = this->pPot->getValue();
-  // Map to 0-100 range for valve percentage
-  int mappedPot = map(potValue, 0, 1, 0, 100);
+  // Convert 0.0-1.0 float to 0-100 percentage
+  int mappedPot = (int)(potValue * 100.0);
   this->pContext->setPotValue(mappedPot);
 
   // ======== COMMAND EXECUTION FROM CUS ========
