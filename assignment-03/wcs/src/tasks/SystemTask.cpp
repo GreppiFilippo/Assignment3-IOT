@@ -50,6 +50,7 @@ void SystemTask::tick() {
 
       this->pPot->sync();
       float potValue = this->pPot->getValue();
+
       this->pContext->setValveOpening(pContext->getMsgOpening());
 
       if (this->pBtn->wasPressed()) {

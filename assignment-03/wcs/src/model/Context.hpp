@@ -34,6 +34,7 @@ class Context {
   unsigned int getMsgOpening();
   Mode getMsgMode();
   void onBtnPressed();
+  void serializeData(JsonDocument& doc);
 
  private:
   float potValue;

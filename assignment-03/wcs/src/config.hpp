@@ -24,4 +24,8 @@
 
 #define LCD_TASK_PERIOD 1000
 
+#define JSON_UPDATE_PERIOD_MS 1000
+
+#define ALIVE "alive"
+
 #endif  // __CONFIG__

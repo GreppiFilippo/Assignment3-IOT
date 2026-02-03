@@ -5,8 +5,8 @@
 #include "kernel/Scheduler.hpp"
 #include "model/Context.hpp"
 #include "model/HWPlatform.hpp"
-#include "tasks/ConnectionTask.hpp"
 #include "tasks/LCDTask.hpp"
+#include "tasks/MsgTask.hpp"
 #include "tasks/SystemTask.hpp"
 #include "tasks/TestHWTask.hpp"
 #include "tasks/ValveTask.hpp"
@@ -31,8 +31,8 @@ void setup() {
 #ifndef __TESTING_HW__
   pContext = new Context();
 
-  Task* pConnectionTask = new ConnectionTask(pContext, &MsgService);
-  pConnectionTask->init(CONNECTION_TASK_PERIOD);
+  Task* pMsgTask = new MsgTask(pContext, &MsgService);
+  pMsgTask->init(MSG_TASK_PERIOD);
 
   Task* pSystemTask = new SystemTask(pContext, pHWPlatform->getButton(),
                                      pHWPlatform->getPotentiometer());
@@ -44,7 +44,7 @@ void setup() {
   Task* pLcdTask = new LCDTask(pHWPlatform->getLCD(), pContext);
   pLcdTask->init(LCD_TASK_PERIOD);
 
-  sched.addTask(pConnectionTask);
+  sched.addTask(pMsgTask);
   sched.addTask(pSystemTask);
   sched.addTask(pValveTask);
   sched.addTask(pLcdTask);
