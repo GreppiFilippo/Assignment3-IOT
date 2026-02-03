@@ -9,7 +9,7 @@
 const Context::CmdEntry Context::cmdTable[] = {
     {"set_valve", &Context::cmdSetValve},
     {"set_mode", &Context::cmdSetMode},
-    {"get_status", &Context::cmdGetStatus}};
+};
 
 Context::Context() {
   this->mode = UNCONNECTED;
@@ -67,12 +67,6 @@ void Context::cmdSetMode(JsonDocument& doc) {
   }
 }
 
-void Context::cmdGetStatus(JsonDocument& doc) {
-  // This command triggers immediate status send in MsgTask
-  // No state change needed here
-  Logger.log(F("CMD_STATUS"));
-}
-
 // ============ Command Consumption ============
 
 bool Context::hasValveCommand() { return valveCmd.pending; }
@@ -124,4 +118,3 @@ void Context::setMode(Mode mode) { this->mode = mode; }
 const Context::CmdEntry* Context::getCmdTable() { return cmdTable; }
 
 int Context::getCmdTableSize() { return sizeof(cmdTable) / sizeof(CmdEntry); }
-

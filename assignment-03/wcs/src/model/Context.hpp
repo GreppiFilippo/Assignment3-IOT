@@ -18,7 +18,6 @@ class Context {
   // Command handlers - called by MsgTask when CUS sends commands
   void cmdSetValve(JsonDocument& doc);
   void cmdSetMode(JsonDocument& doc);
-  void cmdGetStatus(JsonDocument& doc);
 
   // Command consumption - used by tasks to execute commands
   bool hasValveCommand();
