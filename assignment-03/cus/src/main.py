@@ -2,13 +2,12 @@ from ast import List
 from models.system_model import SystemModel
 from utils.logger import setup_logging, get_logger
 import asyncio
-from core.system_controller import SystemController
+from controllers.system_controller import SystemController
 from services.event_dispatcher import EventDispatcher
 from services.mqtt_service import MQTTService
 from services.serial_service import SerialService
 from services.http_service import HttpService
 import config
-from core.mock_controller import MockController
 
 
 # Setup logging
