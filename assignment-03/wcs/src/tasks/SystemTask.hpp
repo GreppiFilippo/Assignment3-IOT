@@ -10,7 +10,7 @@ class SystemTask : public Task {
   Button* pBtn;
   Potentiometer* pPot;
 
-  enum State { EVALUATING, AUTOMATIC, MANUAL } state;
+  enum State { UNCONNECTED, AUTOMATIC, MANUAL } state;
 
   bool justEntered;
   unsigned long stateTimestamp;

@@ -10,10 +10,16 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 
 void SystemTask::tick() {
   switch (this->state) {
-    case EVALUATING:
-      if (this->pContext->getMode() == Context::AUTOMATIC) {
+    case UNCONNECTED:
+      if (this->checkAndSetJustEntered()) {
+        this->pContext->setLCDMessage(LCD_UNCONNECTED);
+      }
+
+      pContext->setValveOpening(pPot->getValue());
+
+      if (this->pContext->getMsgMode() == Context::AUTOMATIC) {
         this->setState(AUTOMATIC);
-      } else if (this->pContext->getMode() == Context::MANUAL) {
+      } else if (this->pContext->getMsgMode() == Context::MANUAL) {
         this->setState(MANUAL);
       }
       break;
@@ -23,14 +29,14 @@ void SystemTask::tick() {
       }
 
       if (this->pBtn->wasPressed()) {
-        this->pContext->setButtonPressed();
+        this->pContext->onBtnPressed();
       }
 
-      if (!this->pContext->isConnected()) {
-        this->setState(EVALUATING);
-      }
+      this->pContext->setValveOpening(pContext->getMsgOpening());
 
-      if (this->pContext->getMode() == Context::MANUAL) {
+      if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
+        this->setState(UNCONNECTED);
+      } else if (this->pContext->getMsgMode() == Context::MANUAL) {
         this->setState(MANUAL);
       }
 
@@ -43,15 +49,18 @@ void SystemTask::tick() {
 
       this->pPot->sync();
       float potValue = this->pPot->getValue();
-      this->pContext->setValveOpening(potValue);
-
-      if (this->pContext->getMode() == Context::AUTOMATIC) {
-        this->setState(AUTOMATIC);
-      }
+      this->pContext->setValveOpening(pContext->getMsgOpening());
 
       if (this->pBtn->wasPressed()) {
         this->pContext->setButtonPressed();
       }
+
+      if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
+        this->setState(UNCONNECTED);
+      } else if (this->pContext->getMsgMode() == Context::AUTOMATIC) {
+        this->setState(AUTOMATIC);
+      }
+
       break;
   }
 }

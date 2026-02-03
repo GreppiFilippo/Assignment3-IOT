@@ -1,3 +1,5 @@
+#include "kernel/MsgService.hpp"
+
 #ifndef __CONTEXT__
 #define __CONTEXT__
 
@@ -8,14 +10,12 @@
 class Context {
  public:
   enum Mode { UNCONNECTED, AUTOMATIC, MANUAL };
-  Context();
-  int getValveOpening();
-  Mode getMode();
 
-  /**
-   * @brief Register button input
-   *
-   */
+  Msg lastMsg;
+  unsigned int valvePosition;
+
+  Context();
+
   void setButtonPressed();
 
   /**
@@ -26,15 +26,21 @@ class Context {
    */
   bool isConnected();
 
-  void setValveOpening(float opening);
+  void setValveOpening(unsigned int opening);
   void setMode(Mode mode);
-
   const char* getLCDMessage() const;
   void setLCDMessage(const char* msg);
+  unsigned int getValveOpening();
+  unsigned int getMsgOpening();
+  Mode getMsgMode();
+  void onBtnPressed();
 
  private:
+  float potValue;
   Mode mode;
   float valveOpening;
+  const char* lcdMessage;
+  bool buttonPressed;
 };
 
 #endif
