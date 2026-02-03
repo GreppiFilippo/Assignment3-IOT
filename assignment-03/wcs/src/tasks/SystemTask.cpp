@@ -2,6 +2,8 @@
 
 #include "config.hpp"
 
+static int getMappedPotValue(float potValue) { return (int)(potValue * 100.0); }
+
 SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
   this->pContext = context;
   this->pBtn = btn;
@@ -10,62 +12,89 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 }
 
 void SystemTask::tick() {
-  // ======== SENSOR READING & EVENT GENERATION ========
-  
-  // Check button press and notify Context (MsgTask will send event)
-  if (this->pBtn->wasPressed()) {
-    this->pContext->setButtonPressed();
-  }
-
-  // Read potentiometer and update Context
-  this->pPot->sync();
-  float potValue = this->pPot->getValue();
-  // Convert 0.0-1.0 float to 0-100 percentage
-  int mappedPot = (int)(potValue * 100.0);
-  this->pContext->setPotValue(mappedPot);
-
-  // ======== COMMAND EXECUTION FROM CUS ========
-  
-  // Apply mode command if received from CUS
-  if (this->pContext->hasModeCommand()) {
-    Context::Mode newMode = this->pContext->consumeModeCommand();
-    
-    switch (newMode) {
-      case Context::UNCONNECTED:
-        setState(UNCONNECTED);
-        break;
-      case Context::AUTOMATIC:
-        setState(AUTOMATIC);
-        break;
-      case Context::MANUAL:
-        setState(MANUAL);
-        break;
-    }
-  }
-
-  // ======== STATE-SPECIFIC BEHAVIOR ========
-  
   switch (this->state) {
-    case UNCONNECTED:
+    case UNCONNECTED: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_UNCONNECTED);
         this->pContext->setMode(Context::UNCONNECTED);
       }
-      break;
 
-    case AUTOMATIC:
+      this->pPot->sync();
+      float potValue = this->pPot->getValue();
+      this->pContext->setValveOpening(getMappedPotValue(potValue));
+
+      if (this->pContext->hasModeCommand()) {
+        Context::Mode newMode = this->pContext->consumeModeCommand();
+        if (newMode == Context::MANUAL) {
+          setState(MANUAL);
+          return;
+        } else if (newMode == Context::AUTOMATIC) {
+          setState(AUTOMATIC);
+          return;
+        }
+      }
+      break;
+    }
+
+    case AUTOMATIC: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
         this->pContext->setMode(Context::AUTOMATIC);
       }
-      break;
 
-    case MANUAL:
+      if (this->pBtn->wasPressed()) {
+        this->pContext->setButtonPressed();
+      }
+
+      if (this->pContext->hasModeCommand()) {
+        Context::Mode newMode = this->pContext->consumeModeCommand();
+        if (newMode == Context::MANUAL) {
+          setState(MANUAL);
+          return;
+        } else if (newMode == Context::UNCONNECTED) {
+          setState(UNCONNECTED);
+          return;
+        }
+      }
+
+      if (this->pContext->hasValveCommand()) {
+        unsigned int valvePos = this->pContext->consumeValveCommand();
+        this->pContext->setValveOpening(valvePos);
+      }
+      break;
+    }
+
+    case MANUAL: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_MANUAL_MODE);
         this->pContext->setMode(Context::MANUAL);
       }
+
+      if (this->pContext->hasModeCommand()) {
+        Context::Mode newMode = this->pContext->consumeModeCommand();
+        if (newMode == Context::AUTOMATIC) {
+          setState(AUTOMATIC);
+          return;
+        } else if (newMode == Context::UNCONNECTED) {
+          setState(UNCONNECTED);
+          return;
+        }
+      }
+
+      if (this->pBtn->wasPressed()) {
+        this->pContext->setButtonPressed();
+      }
+
+      if (this->pContext->hasValveCommand()) {
+        unsigned int valvePos = this->pContext->consumeValveCommand();
+        this->pContext->setValveOpening(valvePos);
+      }
+
+      this->pPot->sync();
+      float potValue = this->pPot->getValue();
+      this->pContext->setPotValue(getMappedPotValue(potValue));
       break;
+    }
   }
 }
 

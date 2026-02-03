@@ -14,31 +14,18 @@ ValveTask::ValveTask(Context* context, ServoMotor* servo)
 }
 
 void ValveTask::tick() {
-  // ======== COMMAND EXECUTION FROM CUS ========
-  
-  // Check if CUS sent a valve command
-  if (pContext->hasValveCommand()) {
-    unsigned int targetPosition = pContext->consumeValveCommand();
-    
-    if (targetPosition != currentPosition) {
-      // Update context with new target
-      pContext->setValveOpening(targetPosition);
-      setState(MOVING);
-    }
-  }
-
-  // ======== STATE MACHINE ========
-  
   switch (this->state) {
     case IDLE:
-      // Wait for commands from CUS
+      if (this->pContext->getValveOpening() != currentPosition) {
+        setState(MOVING);
+      }
       break;
-      
+
     case MOVING:
       if (checkAndSetJustEntered()) {
         moveValve(pContext->getValveOpening());
       }
-      
+
       if (inPosition()) {
         currentPosition = pContext->getValveOpening();
         setState(IDLE);
@@ -47,15 +34,16 @@ void ValveTask::tick() {
   }
 }
 
-void ValveTask::moveValve(int position) { 
+void ValveTask::moveValve(int position) {
   // Map percentage (0-100) to servo angle
   int angle = map(position, 0, 100, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
-  this->pServo->setPosition(angle); 
+  this->pServo->setPosition(angle);
 }
 
 bool ValveTask::inPosition() {
-  unsigned int time = abs((int)(currentPosition - pContext->getValveOpening())) *
-                      MSEC_PER_PERCENT;
+  unsigned int time =
+      abs((int)(currentPosition - pContext->getValveOpening())) *
+      MSEC_PER_PERCENT;
   return elapsedTimeInState() >= time;
 }
 

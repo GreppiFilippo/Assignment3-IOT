@@ -26,20 +26,20 @@ void MsgTask::tick() {
       if (content.length() > 0 && content.length() < sizeof(commonBuf)) {
         strcpy(commonBuf, content.c_str());
         char* jsonStart = strchr(commonBuf, '{');
-        
+
         if (jsonStart) {
           jsonDoc.clear();
           DeserializationError err = deserializeJson(jsonDoc, jsonStart);
-          
+
           if (err == DeserializationError::Ok) {
             // Command dispatch using lookup table
             const char* cmd = jsonDoc["cmd"];
-            
+
             if (cmd) {
               bool handled = false;
               const Context::CmdEntry* cmdTable = Context::getCmdTable();
               int tableSize = Context::getCmdTableSize();
-              
+
               for (int i = 0; i < tableSize; i++) {
                 if (strcmp(cmd, cmdTable[i].name) == 0) {
                   // Execute command handler
@@ -48,7 +48,7 @@ void MsgTask::tick() {
                   break;
                 }
               }
-              
+
               if (!handled) {
                 Logger.log(F("CMD_UNKNOWN"));
               }
@@ -66,7 +66,7 @@ void MsgTask::tick() {
   }
 
   // ======== OUTGOING EVENTS TO CUS ========
-  
+
   // Send button events immediately
   if (pContext->wasButtonPressed()) {
     jsonDoc.clear();
@@ -95,7 +95,7 @@ void MsgTask::tick() {
     jsonDoc["mode"] = getModeString(pContext->getMode());
     jsonDoc["valve_pos"] = pContext->getValveOpening();
     jsonDoc["uptime"] = millis();
-    
+
     serializeJson(jsonDoc, commonBuf, sizeof(commonBuf));
     this->pMsgService->sendMsgRaw(commonBuf, true);
     lastJsonSent = millis();
