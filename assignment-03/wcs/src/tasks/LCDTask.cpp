@@ -13,7 +13,8 @@ void LCDTask::tick() {
   const char* msg = this->pContext->getLCDMessage();
   float valvePos = this->pContext->getValveOpening();
   char buf[20];
-  snprintf(buf, sizeof(buf), "Valve: %.1f%%", valvePos);
+  int intPart = (int)valvePos;
+  snprintf(buf, sizeof(buf), "Valve: %d%%", intPart);
   if (strcmp(msg, this->lastMsg) != 0) {
     this->lcd->print(msg, MODE_LINE);
     strncpy(this->lastMsg, msg, sizeof(this->lastMsg) - 1);
