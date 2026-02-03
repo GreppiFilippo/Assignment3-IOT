@@ -1,4 +1,5 @@
 from ast import List
+from models.system_model import SystemModel
 from utils.logger import setup_logging, get_logger
 import asyncio
 from core.system_controller import SystemController
@@ -17,6 +18,8 @@ logger = get_logger(__name__)
 
 async def main():
     logger.info("Initializing CUS application")
+
+    model = SystemModel()
 
     # Create shared dependencies
     event_dispatcher = EventDispatcher()
@@ -46,6 +49,7 @@ async def main():
     services = [mqtt_service, serial_service, http_service]
 
     controller = SystemController(
+        model=model,
         event_dispatcher=event_dispatcher,
         mqtt_service=mqtt_service, 
         serial_service=serial_service, 

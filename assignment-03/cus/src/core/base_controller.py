@@ -79,7 +79,7 @@ class BaseController(ABC):
         await self._dispatcher.stop()
     
     # -------------------- Lifecycle Hooks --------------------
-    
+    @abstractmethod
     async def _on_start(self) -> None:
         """
         Hook called before services start.
@@ -88,7 +88,8 @@ class BaseController(ABC):
         (e.g., start watchdogs, initialize state).
         """
         pass
-    
+
+    @abstractmethod
     async def _on_stop(self) -> None:
         """
         Hook called before services stop.
