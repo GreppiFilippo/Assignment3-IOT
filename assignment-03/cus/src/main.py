@@ -1,4 +1,3 @@
-from ast import List
 from models.system_model import SystemModel
 from utils.logger import setup_logging, get_logger
 import asyncio

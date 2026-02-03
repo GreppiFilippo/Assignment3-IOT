@@ -19,6 +19,18 @@ class ValveRequest(BaseModel):
     opening: float = Field(..., ge=0, le=100, description="Opening percentage (0-100)")
 
 
+class TankLevelPayload(BaseModel):
+    """
+    MQTT payload for tank/level topic.
+    """
+    level: float = Field(..., description="Water level in cm")
+    timestamp: int = Field(..., description="Timestamp in milliseconds")
+    
+    def to_datetime(self) -> datetime:
+        """Convert timestamp to datetime object"""
+        return datetime.fromtimestamp(self.timestamp / 1000.0)
+
+
 class LevelReading(BaseModel):
     """
     Water level reading from the sensor.

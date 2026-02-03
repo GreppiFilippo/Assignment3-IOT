@@ -32,7 +32,6 @@
 #define MQTT_BROKER "broker.mqtt-dashboard.com"
 #define MQTT_PORT 1883
 #define MQTT_TOPIC_LEVEL "tank/level"
-#define MQTT_TOPIC_STATUS "tank/status"
 #define MQTT_CLIENT_ID "ESP32_TMS"
 
 /***********************

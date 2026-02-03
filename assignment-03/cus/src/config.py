@@ -1,9 +1,9 @@
 """Configuration settings for the CUS system."""
 
 # === MQTT Configuration ===
-MQTT_BROKER_HOST = "localhost"
+MQTT_BROKER_HOST = "broker.mqtt-dashboard.com"
 MQTT_BROKER_PORT = 1883
-MQTT_TOPIC = "sensors/#"
+MQTT_TOPIC = "tank/level"
 
 # === Serial Configuration ===
 SERIAL_PORT = "COM3"  # Change to "/dev/ttyUSB0" on Linux/Mac
