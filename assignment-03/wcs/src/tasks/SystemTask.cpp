@@ -6,6 +6,7 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
   this->pContext = context;
   this->pBtn = btn;
   this->pPot = pot;
+  this->setState(UNCONNECTED);
 }
 
 void SystemTask::tick() {
