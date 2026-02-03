@@ -26,7 +26,7 @@ LCD* HWPlatform::getLCD() { return this->pLCD; }
 Button* HWPlatform::getButton() { return this->pButton; }
 
 void HWPlatform::test() {
-  this->pLCD->print("Testing Servo Motor...");
+  this->pLCD->print("Testing Servo Motor...", MODE_LINE);
   this->pServo->on();
   delay(1000);
   this->pServo->setPosition(0);
@@ -38,17 +38,17 @@ void HWPlatform::test() {
   this->pServo->off();
   this->pLCD->clear();
 
-  this->pLCD->print("Testing Potentiometer...");
+  this->pLCD->print("Testing Potentiometer...", MODE_LINE);
   this->pPotentiometer->sync();
   float potValue = this->pPotentiometer->getValue();
-  this->pLCD->print(("Value: " + String(potValue)).c_str());
+  this->pLCD->print(("Value: " + String(potValue)).c_str(), MODE_LINE);
   delay(2000);
   this->pLCD->clear();
-  this->pLCD->print("Testing Button...");
+  this->pLCD->print("Testing Button...", MODE_LINE);
   while (!this->pButton->wasPressed()) {
     // Wait for button press
   }
-  this->pLCD->print("Button Pressed!");
+  this->pLCD->print("Button Pressed!", MODE_LINE);
   delay(2000);
   this->pLCD->clear();
 }
