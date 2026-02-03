@@ -12,13 +12,13 @@ ValveTask::ValveTask(Context* context, ServoMotor* servo)
 void ValveTask::tick() {
   switch (this->state) {
     case IDLE:
-      if (currentPosition != pContext->getValveOpening()) {
+      if (currentPosition != pContext->getRequestedValveOpening()) {
         setState(MOVING);
       }
       break;
     case MOVING:
       if (checkAndSetJustEntered()) {
-        moveValve(pContext->getValveOpening());
+        moveValve(pContext->getRequestedValveOpening());
       }
       if (inPosition()) {
         setState(IDLE);
@@ -30,8 +30,8 @@ void ValveTask::tick() {
 void ValveTask::moveValve(int position) { this->pServo->setPosition(position); }
 
 bool ValveTask::inPosition() {
-  unsigned int time =
-      (currentPosition - pContext->getValveOpening()) * MSEC_PER_PERCENT;
+  unsigned int time = (currentPosition - pContext->getRequestedValveOpening()) *
+                      MSEC_PER_PERCENT;
   return elapsedTimeInState() >= abs(time);
 }
 

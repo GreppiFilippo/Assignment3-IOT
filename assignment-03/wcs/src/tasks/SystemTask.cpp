@@ -11,12 +11,15 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 
 void SystemTask::tick() {
   switch (this->state) {
-    case UNCONNECTED:
+    case UNCONNECTED: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_UNCONNECTED);
       }
 
-      pContext->setValveOpening(pPot->getValue());
+      int potValue =
+          map(this->pPot->getValue(), 0, 1, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
+
+      pContext->setRequestedValveOpening(potValue);
 
       if (this->pContext->getMsgMode() == Context::AUTOMATIC) {
         this->setState(AUTOMATIC);
@@ -24,16 +27,17 @@ void SystemTask::tick() {
         this->setState(MANUAL);
       }
       break;
-    case AUTOMATIC:
+    }
+    case AUTOMATIC: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
       }
 
       if (this->pBtn->wasPressed()) {
-        this->pContext->onBtnPressed();
+        this->pContext->requestModeChange();
       }
 
-      this->pContext->setValveOpening(pContext->getMsgOpening());
+      this->pContext->setRequestedValveOpening(pContext->getMsgOpening());
 
       if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
         this->setState(UNCONNECTED);
@@ -42,19 +46,22 @@ void SystemTask::tick() {
       }
 
       break;
-    case MANUAL:
-
+    }
+    case MANUAL: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_MANUAL_MODE);
       }
 
       this->pPot->sync();
-      float potValue = this->pPot->getValue();
+      int potValue =
+          map(this->pPot->getValue(), 0, 1, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
+      this->pContext->setPotValue(potValue);
 
-      this->pContext->setValveOpening(pContext->getMsgOpening());
+      // TODO: to be changed
+      this->pContext->setRequestedValveOpening(pContext->getMsgOpening());
 
       if (this->pBtn->wasPressed()) {
-        this->pContext->setButtonPressed();
+        this->pContext->requestModeChange();
       }
 
       if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
@@ -64,6 +71,7 @@ void SystemTask::tick() {
       }
 
       break;
+    }
   }
 }
 
