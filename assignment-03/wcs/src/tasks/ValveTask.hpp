@@ -6,7 +6,7 @@ class ValveTask : public Task {
  private:
   Context* pContext;
   ServoMotor* pServo;
-  int currentPosition;
+  unsigned int currentPosition;
 
   long stateTimestamp;
   bool justEntered;

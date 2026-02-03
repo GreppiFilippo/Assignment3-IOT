@@ -10,68 +10,62 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 }
 
 void SystemTask::tick() {
+  // ======== SENSOR READING & EVENT GENERATION ========
+  
+  // Check button press and notify Context (MsgTask will send event)
+  if (this->pBtn->wasPressed()) {
+    this->pContext->setButtonPressed();
+  }
+
+  // Read potentiometer and update Context
+  this->pPot->sync();
+  float potValue = this->pPot->getValue();
+  // Map to 0-100 range for valve percentage
+  int mappedPot = map(potValue, 0, 1, 0, 100);
+  this->pContext->setPotValue(mappedPot);
+
+  // ======== COMMAND EXECUTION FROM CUS ========
+  
+  // Apply mode command if received from CUS
+  if (this->pContext->hasModeCommand()) {
+    Context::Mode newMode = this->pContext->consumeModeCommand();
+    
+    switch (newMode) {
+      case Context::UNCONNECTED:
+        setState(UNCONNECTED);
+        break;
+      case Context::AUTOMATIC:
+        setState(AUTOMATIC);
+        break;
+      case Context::MANUAL:
+        setState(MANUAL);
+        break;
+    }
+  }
+
+  // ======== STATE-SPECIFIC BEHAVIOR ========
+  
   switch (this->state) {
-    case UNCONNECTED: {
+    case UNCONNECTED:
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_UNCONNECTED);
-      }
-
-      int potValue =
-          map(this->pPot->getValue(), 0, 1, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
-
-      pContext->setRequestedValveOpening(potValue);
-
-      if (this->pContext->getMsgMode() == Context::AUTOMATIC) {
-        this->setState(AUTOMATIC);
-      } else if (this->pContext->getMsgMode() == Context::MANUAL) {
-        this->setState(MANUAL);
+        this->pContext->setMode(Context::UNCONNECTED);
       }
       break;
-    }
-    case AUTOMATIC: {
+
+    case AUTOMATIC:
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
+        this->pContext->setMode(Context::AUTOMATIC);
       }
-
-      if (this->pBtn->wasPressed()) {
-        this->pContext->requestModeChange();
-      }
-
-      this->pContext->setRequestedValveOpening(pContext->getMsgOpening());
-
-      if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
-        this->setState(UNCONNECTED);
-      } else if (this->pContext->getMsgMode() == Context::MANUAL) {
-        this->setState(MANUAL);
-      }
-
       break;
-    }
-    case MANUAL: {
+
+    case MANUAL:
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_MANUAL_MODE);
+        this->pContext->setMode(Context::MANUAL);
       }
-
-      this->pPot->sync();
-      int potValue =
-          map(this->pPot->getValue(), 0, 1, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
-      this->pContext->setPotValue(potValue);
-
-      // TODO: to be changed
-      this->pContext->setRequestedValveOpening(pContext->getMsgOpening());
-
-      if (this->pBtn->wasPressed()) {
-        this->pContext->requestModeChange();
-      }
-
-      if (this->pContext->getMsgMode() == Context::UNCONNECTED) {
-        this->setState(UNCONNECTED);
-      } else if (this->pContext->getMsgMode() == Context::AUTOMATIC) {
-        this->setState(AUTOMATIC);
-      }
-
       break;
-    }
   }
 }
 

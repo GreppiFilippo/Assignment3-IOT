@@ -10,14 +10,17 @@
 
 /**
  * @brief Task that continuously consumes messages from serial
- * and stores them in Context's message queue.
- * Also periodically sends JSON state updates to serial.
+ * and dispatches commands to Context handlers.
+ * Also sends events and periodic heartbeat to CUS.
  */
 class MsgTask : public Task {
  private:
   Context* pContext;
   MsgServiceClass* pMsgService;
   unsigned long lastJsonSent;
+  float lastPotValue;
+
+  const char* getModeString(Context::Mode mode);
 
  public:
   /**
@@ -30,7 +33,7 @@ class MsgTask : public Task {
   /**
    * @brief Task execution method called by the scheduler when the task runs.
    *
-   * Processes incoming messages and sends periodic JSON updates.
+   * Processes incoming commands and sends events to CUS.
    *
    */
 

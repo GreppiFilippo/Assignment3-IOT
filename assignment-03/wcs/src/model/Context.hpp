@@ -6,84 +6,72 @@
 #include <ArduinoJson.h>
 
 /**
- * @brief Context class to hold system state
+ * @brief Context class to hold system state and manage commands from CUS
  *
  */
 class Context {
- private:
-  float potValue;
-  float valveOpening;
-  const char* lcdMessage;
-  bool isModeChangeRequested;
-  unsigned int valvePosition;
-
  public:
-  /**
-   * @brief System modes
-   *
-   */
-  enum Mode { UNCONNECTED, AUTOMATIC, MANUAL } mode;
+  enum Mode { UNCONNECTED, AUTOMATIC, MANUAL };
 
   Context();
 
-  /**
-   * @brief Set requested valve opening
-   *
-   * @param opening
-   */
-  void setRequestedValveOpening(int opening);
+  // Command handlers - called by MsgTask when CUS sends commands
+  void cmdSetValve(JsonDocument& doc);
+  void cmdSetMode(JsonDocument& doc);
+  void cmdGetStatus(JsonDocument& doc);
 
-  /**
-   * @brief Change system mode
-   *
-   * @param mode New mode
-   */
-  void setMode(Mode mode);
+  // Command consumption - used by tasks to execute commands
+  bool hasValveCommand();
+  unsigned int consumeValveCommand();
+  bool hasModeCommand();
+  Mode consumeModeCommand();
 
-  /**
-   * @brief Get LCD message
-   *
-   * @return const char* LCD message
-   */
+  // State getters for event serialization
+  Mode getMode() const;
+  unsigned int getValveOpening() const;
+  bool wasButtonPressed();
+  float getPotValue() const;
   const char* getLCDMessage() const;
 
-  /**
-   * @brief Set LCD message
-   *
-   * @param msg New LCD message
-   */
-  void setLCDMessage(const char* msg);
-
-  /**
-   * @brief Get requested valve opening
-   *
-   * @return int Requested valve opening
-   */
-  int getRequestedValveOpening();
-
-  /**
-   * @brief Request mode change
-   *
-   */
-  void requestModeChange();
-
-  /**
-   * @brief Serialize context data to JSON
-   *
-   * @param doc JSON document to serialize data into
-   */
-  void serializeData(JsonDocument& doc);
-
-  /**
-   * @brief Set the potentiometer Value
-   *
-   * @param value New potentiometer value
-   */
+  // State setters - used by tasks to update local state
+  void setValveOpening(unsigned int opening);
   void setPotValue(float value);
+  void setButtonPressed();
+  void setLCDMessage(const char* msg);
+  void setMode(Mode mode);
 
-  // TODO: to be changed
-  Mode getMsgMode();
-  unsigned int getMsgOpening();
+  // Command registry
+  typedef void (Context::*CmdHandler)(JsonDocument&);
+  struct CmdEntry {
+    const char* name;
+    CmdHandler handler;
+  };
+  static const CmdEntry* getCmdTable();
+  static int getCmdTableSize();
+
+ private:
+  // Command buffers - set by MsgTask, consumed by tasks
+  struct ValveCommand {
+    bool pending;
+    unsigned int position;
+    unsigned long timestamp;
+  } valveCmd;
+
+  struct ModeCommand {
+    bool pending;
+    Mode mode;
+    unsigned long timestamp;
+  } modeCmd;
+
+  // Current state
+  Mode mode;
+  unsigned int valveOpening;
+  float potValue;
+  bool buttonPressed;
+  const char* lcdMessage;
+
+  // Command table
+  static const CmdEntry cmdTable[];
 };
 
 #endif
