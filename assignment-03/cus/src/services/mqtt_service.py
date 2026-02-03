@@ -3,6 +3,7 @@ from .base_service import BaseService
 import paho.mqtt.client as mqtt
 from utils.logger import get_logger
 from .event_bus import EventBus
+import json
 
 logger = get_logger(__name__)
 
@@ -115,12 +116,18 @@ class MQTTService(BaseService):
         try:
             payload = msg.payload.decode("utf-8")
             logger.debug(f"{self.name} received MQTT message: {payload}")
-            
-            # Publish as domain event "tank.level" using EventBus
-            asyncio.run_coroutine_threadsafe(
-                EventBus.publish("tank.level", level=payload),
-                self._loop
-            )
+            data = json.loads(payload)
+
+            for topic, event_data in data.items():
+                if not isinstance(event_data, dict):
+                    logger.warning(f"Skipping topic {topic}: payload not dict")
+                    continue
+
+                asyncio.run_coroutine_threadsafe(
+                    logger.debug("Pubblico su" + topic + " i dati " + str(event_data)),
+                    EventBus.publish(topic, **event_data),
+                    self._loop
+                )
 
         except Exception as e:
             logger.exception(f"{self.name} failed to process MQTT message: {e}")

@@ -42,6 +42,12 @@ async def main():
 
     event_bus.subscribe(config.LEVEL_OUT_TOPIC, setstatus)
     event_bus.subscribe(config.REQUESTED_OPENING, orchestrator.handle_req_opening)
+    event_bus.subscribe(config.MODE_CHANGE, orchestrator.handle_mode_change)
+    event_bus.subscribe(config.LEVEL_IN_TOPIC, orchestrator.handle_new_measurement)
+
+    event_bus.subscribe(config.MODE, serial_service.store_new_mode)
+    event_bus.subscribe(config.OPENING, serial_service.store_new_opening)
+    
 
     # Create controller (transport-agnostic)
     services = [mqtt_service, serial_service, http_service]

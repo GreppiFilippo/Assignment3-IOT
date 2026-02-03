@@ -6,6 +6,7 @@ MQTT_BROKER_PORT = 1883
 LEVEL_IN_TOPIC = "level_in"
 LEVEL_OUT_TOPIC = "level_out"
 REQUESTED_OPENING = "requested_opening"
+MODE= "mode"
 MODE_CHANGE = "mode_change"
 OPENING = "opening"
 
