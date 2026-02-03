@@ -23,8 +23,8 @@
 /***********************
  * WIFI CONFIGURATION
  ***********************/
-#define WIFI_SSID "Redmi 10"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID "Galaxy S21+ 5G "
+#define WIFI_PASSWORD "mslm7784"
 
 /***********************
  * MQTT CONFIGURATION
