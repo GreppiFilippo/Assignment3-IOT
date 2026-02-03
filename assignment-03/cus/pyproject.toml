@@ -11,6 +11,7 @@ dependencies = [
     "requests>=2.32.0",
     "pyserial>=3.5",
     "pydantic>=2.12.5",
+    "pypubsub>=4.0.7",
 ]
 authors = [
     {name = "Filippo Greppi", email = "filippo.greppi2@studio.unibo.it"},

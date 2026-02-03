@@ -94,24 +94,38 @@ class HttpService(BaseService):
         return self
 
     async def run(self):
-        """Run HTTP service with uvicorn server."""
-        logger.info(f"{self.name} starting server on {self.host}:{self.port}")
+        """Run HTTP service with auto-restart on failure."""
+        retry_interval = 5  # seconds between restart attempts
         
-        config = uvicorn.Config(
-            app=self._app,
-            host=self.host,
-            port=self.port,
-            log_level="info",
-        )
-        self._server = uvicorn.Server(config)
-        
-        try:
-            await self._server.serve()
-        except asyncio.CancelledError:
-            logger.info(f"{self.name} server cancelled")
-        finally:
-            if self._server:
-                await self._server.shutdown()
+        while self._running:
+            logger.info(f"{self.name} starting server on {self.host}:{self.port}")
+            
+            config = uvicorn.Config(
+                app=self._app,
+                host=self.host,
+                port=self.port,
+                log_level="info",
+            )
+            self._server = uvicorn.Server(config)
+            
+            try:
+                await self._server.serve()
+                # If serve() completes normally, exit the loop
+                break
+            except asyncio.CancelledError:
+                logger.info(f"{self.name} server cancelled")
+                break
+            except Exception as e:
+                logger.error(f"{self.name} server failed: {e}")
+                logger.info(f"{self.name} will restart in {retry_interval}s")
+                # Sleep in small intervals to allow quick shutdown
+                for _ in range(retry_interval * 10):
+                    if not self._running:
+                        break
+                    await asyncio.sleep(0.1)
+            finally:
+                if self._server:
+                    await self._server.shutdown()
                 
     async def stop(self):
         """Stop the HTTP server gracefully."""

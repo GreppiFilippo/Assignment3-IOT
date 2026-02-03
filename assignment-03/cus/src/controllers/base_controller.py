@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import List, Callable, Dict, Any
+from typing import List
 from services.base_service import BaseService
-from services.event_dispatcher import EventDispatcher
 from utils.logger import get_logger
 import asyncio
 
@@ -14,7 +13,6 @@ class BaseController(ABC):
     
     Provides infrastructure for:
     - Managing multiple services lifecycle
-    - Event dispatcher integration
     - Startup/shutdown hooks
     
     Does NOT assume specific service types (MQTT, HTTP, Serial).
@@ -24,17 +22,17 @@ class BaseController(ABC):
     def __init__(
         self,
         services: List[BaseService],
-        event_dispatcher: EventDispatcher
+        event_dispatcher=None  # Deprecated, kept for compatibility
     ):
         """
         Initialize base controller with services.
         
         Args:
             services: List of services to manage
-            event_dispatcher: Event dispatcher for inter-service communication
+            event_dispatcher: (Deprecated) Not used with PyPubSub
         """
         self._services = services
-        self._dispatcher = event_dispatcher
+        self._dispatcher = event_dispatcher  # Unused but kept for compatibility
         
         logger.info(f"{self.__class__.__name__} initialized with {len(services)} service(s)")
     
@@ -45,20 +43,22 @@ class BaseController(ABC):
         Run the controller and all services.
         
         Template method that:
-        1. Starts event dispatcher
-        2. Calls _on_start hook
-        3. Starts all services concurrently
+        1. Calls _on_start hook
+        2. Starts all services concurrently
         """
         logger.info(f"Starting {self.__class__.__name__}")
-        await self._dispatcher.start()
         
         # Subclass hook
         await self._on_start()
         
-        # Start all services as concurrent tasks
-        tasks = [asyncio.create_task(service.run()) for service in self._services]
+        # Start all services (sets _running flag and creates tasks)
+        for service in self._services:
+            await service.start()
         
-        await asyncio.gather(*tasks, return_exceptions=True)
+        # Wait for all service tasks to complete
+        tasks = [service._task for service in self._services if service._task]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
     
     async def stop(self) -> None:
         """
@@ -67,7 +67,6 @@ class BaseController(ABC):
         Template method that:
         1. Calls _on_stop hook
         2. Stops all services
-        3. Stops event dispatcher
         """
         logger.info(f"Stopping {self.__class__.__name__}")
         
@@ -76,7 +75,6 @@ class BaseController(ABC):
         
         for service in self._services:
             await service.stop()
-        await self._dispatcher.stop()
     
     # -------------------- Lifecycle Hooks --------------------
     @abstractmethod

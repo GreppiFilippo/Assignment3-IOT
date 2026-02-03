@@ -2,8 +2,8 @@ import json
 from datetime import datetime
 from pydantic import ValidationError
 from typing import List
+from services.event_dispatcher import EventDispatcher, Event
 from services.base_service import BaseService
-from services.event_bus import EventBus
 from models.system_model import SystemModel
 from models.schemas import LevelReading, TankLevelPayload
 from utils.logger import get_logger
@@ -23,14 +23,15 @@ class SystemController(BaseController):
     """
     System controller implementing business logic for Smart Tank Monitoring.
     
-    Transport-agnostic: communicates via EventBus only, never directly with services.
+    Transport-agnostic: communicates via events only, never directly with services.
     Services can be swapped (Serial ↔ MQTT) without changing controller logic.
     """
 
     def __init__(
         self,
         model: SystemModel,
-        services: List[BaseService]
+        services: List[BaseService],
+        event_dispatcher: EventDispatcher
     ):
         """
         Initialize system controller.
@@ -38,18 +39,20 @@ class SystemController(BaseController):
         Args:
             model: System model for state management
             services: List of services to manage (transport-agnostic)
+            event_dispatcher: Event dispatcher for inter-service communication
         """
         # Initialize base model
         self._model = model
         
-        # Initialize base controller with services list (no event_dispatcher)
-        super().__init__(services=services, event_dispatcher=None)
+        # Initialize base controller with services list
+        super().__init__(
+            services=services,
+            event_dispatcher=event_dispatcher
+        )
         
-        # Subscribe to domain events (input) using EventBus
-        EventBus.subscribe("tank.level", self._on_tank_level_event)
-        EventBus.subscribe("wcs.status", self._on_wcs_status_event)
-        
-        logger.info("SystemController initialized with PyPubSub EventBus")
+        # Subscribe to domain events (input)
+        self._dispatcher.subscribe("tank.level", self._on_tank_level_event)
+        self._dispatcher.subscribe("wcs.status", self._on_wcs_status_event)
 
     async def _on_start(self) -> None:
         """Hook called before services start."""
@@ -61,23 +64,25 @@ class SystemController(BaseController):
     
     # ============ INPUT: Domain Events (from services) ============
     
-    async def _on_tank_level_event(self, level: str) -> None:
+    async def _on_tank_level_event(self, event: Event) -> None:
         """
         Handle tank level updates (transport-agnostic).
-        Level can come from MQTT, Serial, HTTP, etc.
+        Payload can come from MQTT, Serial, HTTP, etc.
         
         Args:
-            level: Water level data (string: JSON or plain text)
+            event: Event with water level data (string or dict)
         """
-        self._process_tank_level(level)
+        payload = event.payload
+        self._process_tank_level(payload)
     
-    async def _on_wcs_status_event(self, data: dict) -> None:
+    async def _on_wcs_status_event(self, event: Event) -> None:
         """
         Handle WCS status updates (valve position confirmations, etc.)
         
         Args:
-            data: WCS status data dictionary
+            event: Event with WCS status data
         """
+        data = event.payload
         logger.info(f"WCS status: {data}")
         # TODO: Update model with valve position, system state, etc.
 
@@ -141,7 +146,7 @@ class SystemController(BaseController):
             position: Valve position percentage (0-100)
         """
         logger.info(f"Controller command: set valve to {position}%")
-        await EventBus.publish("valve.set", position=position)
+        await self._dispatcher.publish("valve.set", {"position": position})
     
     async def _set_alarm(self, active: bool) -> None:
         """
@@ -151,11 +156,11 @@ class SystemController(BaseController):
             active: True to activate alarm, False to deactivate
         """
         logger.info(f"Controller command: set alarm {'ON' if active else 'OFF'}")
-        await EventBus.publish("alarm.set", active=active)
+        await self._dispatcher.publish("alarm.set", {"active": active})
     
     async def _request_system_status(self) -> None:
         """
         Command: Request current system status from WCS.
         """
         logger.debug("Controller command: request system status")
-        await EventBus.publish("system.status.request")
+        await self._dispatcher.publish("system.status.request", {})

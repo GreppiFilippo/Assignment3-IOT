@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
 from utils.logger import get_logger
-from .event_dispatcher import EventDispatcher
-
 
 logger = get_logger(__name__)
 
@@ -13,15 +11,15 @@ class BaseService(ABC):
     Handles async start/stop and controlled looping.
     """
 
-    def __init__(self, name: str, event_dispatcher: EventDispatcher):
+    def __init__(self, name: str, event_dispatcher=None):
         """
         Initialize the service.
         
         :param name: Name of the service
-        :param event_dispatcher: Event dispatcher to publish/subscribe internal events
+        :param event_dispatcher: (Deprecated) Not used with PyPubSub
         """
         self.name = name
-        self.event_dispatcher = event_dispatcher
+        self.event_dispatcher = event_dispatcher  # Keep for backward compat but unused
         self._running = False
         self._task: asyncio.Task | None = None
 

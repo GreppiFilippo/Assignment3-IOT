@@ -2,7 +2,6 @@ from models.system_model import SystemModel
 from utils.logger import setup_logging, get_logger
 import asyncio
 from controllers.system_controller import SystemController
-from services.event_dispatcher import EventDispatcher
 from services.mqtt_service import MQTTService
 from services.serial_service import SerialService
 from services.http_service import HttpService
@@ -15,43 +14,33 @@ logger = get_logger(__name__)
 
 
 async def main():
-    logger.info("Initializing CUS application")
+    logger.info("Initializing CUS application with PyPubSub EventBus")
 
     model = SystemModel()
 
-    # Create shared dependencies
-    event_dispatcher = EventDispatcher()
-
-    # Create services with configuration
+    # Create services (no event_dispatcher needed - using EventBus)
     mqtt_service = MQTTService(
-        event_dispatcher,
-        config.MQTT_BROKER_HOST,
-        config.MQTT_BROKER_PORT,
-        config.MQTT_TOPIC
+        broker=config.MQTT_BROKER_HOST,
+        port=config.MQTT_BROKER_PORT,
+        topics=config.MQTT_TOPIC
     )
 
     serial_service = SerialService(
-        event_dispatcher=event_dispatcher,
         port=config.SERIAL_PORT,
         baudrate=config.SERIAL_BAUDRATE
     )
 
     http_service = HttpService(
-        event_dispatcher,
         host=config.HTTP_HOST,
         port=config.HTTP_PORT
     )
 
-    # Inject dependencies into controller
-    # Controller handles its own handler registration
+    # Create controller (transport-agnostic)
     services = [mqtt_service, serial_service, http_service]
-
+    
     controller = SystemController(
         model=model,
-        event_dispatcher=event_dispatcher,
-        mqtt_service=mqtt_service, 
-        serial_service=serial_service, 
-        http_service=http_service
+        services=services
     )
 
     try:

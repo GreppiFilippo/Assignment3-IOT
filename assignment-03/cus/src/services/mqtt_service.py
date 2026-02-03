@@ -1,21 +1,19 @@
 import asyncio
-import json
 from .base_service import BaseService
 import paho.mqtt.client as mqtt
-from typing import Callable
 from utils.logger import get_logger
-from .event_dispatcher import EventDispatcher
+from .event_bus import EventBus
 
 logger = get_logger(__name__)
 
 class MQTTService(BaseService):
     """
     MQTT service for receiving messages from MQTT broker.
+    Publishes received messages to EventBus for decoupled communication.
     """
 
     def __init__(
         self, 
-        event_dispatcher: EventDispatcher, 
         broker: str, 
         port: int, 
         topics: str | list[str],
@@ -24,8 +22,6 @@ class MQTTService(BaseService):
         """
         Initialize MQTT service.
         
-        :param event_dispatcher: Event dispatcher for inter-service communication
-        :type event_dispatcher: EventDispatcher
         :param broker: MQTT broker address
         :type broker: str
         :param port: MQTT broker port
@@ -35,95 +31,80 @@ class MQTTService(BaseService):
         :param qos: Quality of Service level (0: at most once, 1: at least once, 2: exactly once)
         :type qos: int
         """
-        super().__init__("mqtt_service", event_dispatcher)
+        super().__init__("mqtt_service", None)  # No event_dispatcher needed
         self.broker = broker
         self.port = port
         self.topics = [topics] if isinstance(topics, str) else topics
         self.qos = max(0, min(2, qos))  # Clamp between 0 and 2
         self._client = mqtt.Client()
         self._loop = None
-        self._handlers: dict[str, list[Callable[..., None]]] = {}
-        self._raw_handlers: list[Callable[[str], None]] = []
+        self._connected = False  # Track connection status
 
         self._client.on_connect = self.__on_connect
         self._client.on_message = self.__on_message
         self._client.on_disconnect = self.__on_disconnect
 
-    def register_handler(self, key: str, callback: Callable[..., None]) -> 'MQTTService':
-        """
-        Register a handler for a specific key in MQTT messages (Builder pattern).
-        Multiple handlers can be registered for the same key.
-        
-        Args:
-            key: Key to match in MQTT message payload
-            callback: Handler function to call when key is found
-        
-        Returns:
-            Self for method chaining
-        
-        Example:
-            mqtt.register_handler('level', handle_level) \
-                .register_handler('status', handle_status)
-        """
-        if key not in self._handlers:
-            self._handlers[key] = []
-        self._handlers[key].append(callback)
-        logger.info(f"{self.name} registered handler for '{key}'")
-        return self
-    
-    def register_payload_handler(self, callback: Callable[[str], None]) -> 'MQTTService':
-        """
-        Register a handler that receives the raw payload string.
-        Handler is responsible for parsing (JSON, plain text, etc).
-        
-        Args:
-            callback: Handler function that receives the raw payload string
-        
-        Returns:
-            Self for method chaining
-        
-        Example:
-            mqtt.register_payload_handler(handle_raw_payload)
-        """
-        self._raw_handlers.append(callback)
-        logger.info(f"{self.name} registered raw payload handler")
-        return self
-
     async def run(self):
-        """Run MQTT service"""
+        """Run MQTT service with auto-reconnect"""
         self._loop = asyncio.get_running_loop()
         
         logger.info(f"{self.name} connecting to broker {self.broker}:{self.port}")
         
+        loop_started = False
+        retry_interval = 5  # seconds between reconnection attempts
+        
         try:
             self._client.connect(self.broker, self.port, keepalive=60)
+            self._client.loop_start()
+            loop_started = True
         except Exception as e:
             logger.error(f"{self.name} failed to connect to broker: {e}")
-            return
-            
-        self._client.loop_start()
+            logger.info(f"{self.name} will retry connection every {retry_interval}s")
 
         try:
             while self._running:
+                # Try to reconnect if not connected
+                if not self._connected and not loop_started:
+                    try:
+                        logger.info(f"{self.name} attempting to reconnect...")
+                        self._client.connect(self.broker, self.port, keepalive=60)
+                        self._client.loop_start()
+                        loop_started = True
+                    except Exception as e:
+                        logger.debug(f"{self.name} reconnect failed: {e}")
+                        # Sleep in small intervals to allow quick shutdown
+                        for _ in range(retry_interval * 10):
+                            if not self._running:
+                                break
+                            await asyncio.sleep(0.1)
+                        continue
+                
                 await asyncio.sleep(0.1)
         finally:
-            logger.info(f"{self.name} stopping MQTT loop")
-            self._client.loop_stop()
-            self._client.disconnect()
+            if loop_started:
+                logger.info(f"{self.name} stopping MQTT loop")
+                self._client.loop_stop()
+                self._client.disconnect()
 
     def __on_connect(self, client, userdata, flags, rc):
         """Callback invoked when connection to MQTT broker is established."""
         if rc == 0:
+            self._connected = True
             logger.info(f"{self.name} connected to broker")
             for topic in self.topics:
                 client.subscribe(topic, qos=self.qos)
                 logger.info(f"{self.name} subscribed to topic: {topic} (QoS {self.qos})")
         else:
+            self._connected = False
             logger.error(f"{self.name} failed to connect, rc={rc}")
 
     def __on_disconnect(self, client, userdata, rc):
         """Callback invoked when disconnected from MQTT broker."""
-        logger.warning(f"{self.name} disconnected with rc={rc}")
+        self._connected = False
+        if rc == 0:
+            logger.info(f"{self.name} disconnected cleanly")
+        else:
+            logger.warning(f"{self.name} disconnected unexpectedly (rc={rc}), will attempt reconnect")
 
     def __on_message(self, client, userdata, msg):
         """Callback invoked when message is received from MQTT broker."""
@@ -133,25 +114,13 @@ class MQTTService(BaseService):
             
         try:
             payload = msg.payload.decode("utf-8")
+            logger.debug(f"{self.name} received MQTT message: {payload}")
             
-            # Dispatch raw payload to raw handlers (no parsing)
-            for callback in self._raw_handlers:
-                self._loop.call_soon_threadsafe(callback, payload)
-            
-            # Try parsing as JSON for key-based handlers
-            try:
-                data = json.loads(payload)
-                logger.debug(f"{self.name} received JSON message: {data}")
-                
-                # Dispatch to registered key handlers (receive single values)
-                for key, callbacks in self._handlers.items():
-                    if key in data:
-                        for callback in callbacks:
-                            self._loop.call_soon_threadsafe(callback, data[key])
-            
-            except json.JSONDecodeError:
-                # Not JSON, skip key-based handlers
-                logger.debug(f"{self.name} received non-JSON message: {payload}")
+            # Publish as domain event "tank.level" using EventBus
+            asyncio.run_coroutine_threadsafe(
+                EventBus.publish("tank.level", level=payload),
+                self._loop
+            )
 
         except Exception as e:
             logger.exception(f"{self.name} failed to process MQTT message: {e}")
