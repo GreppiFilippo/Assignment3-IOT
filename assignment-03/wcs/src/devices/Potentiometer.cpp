@@ -9,7 +9,7 @@ void Potentiometer::sync() {
   updateSyncTime(millis());
 }
 
-float Potentiometer::getValue() { return value / 1023.0; }
+float Potentiometer::getValue() { return map(value, 0, 1023, 0, 100); }
 
 void Potentiometer::updateSyncTime(long time) { lastTimeSync = time; }
 
