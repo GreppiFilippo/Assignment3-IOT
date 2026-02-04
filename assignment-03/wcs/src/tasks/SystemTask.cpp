@@ -12,12 +12,6 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 }
 
 void SystemTask::tick() {
-  // Update valve position on LCD
-  char buf[20];
-  unsigned int valvePos = this->pContext->getValveTargetPosition();
-  snprintf(buf, sizeof(buf), "Valve: %d%%", valvePos);
-  this->pContext->setLCDLine(VALVE_LINE, buf);
-
   switch (this->state) {
     case UNCONNECTED: {
       if (this->checkAndSetJustEntered()) {

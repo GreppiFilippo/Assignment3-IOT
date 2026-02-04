@@ -110,7 +110,12 @@ const char* Context::getLCDLine(uint8_t line) const {
 // ============ State Setters ============
 
 void Context::setRequestedValveOpening(unsigned int opening) {
-  this->valveOpening = opening;
+  if (this->valveOpening != opening) {
+    this->valveOpening = opening;
+    char buf[20];
+    snprintf(buf, sizeof(buf), "Valve: %d%%", opening);
+    this->setLCDLine(VALVE_LINE, buf);
+  }
 }
 
 void Context::setPotValueToValidate(float value) { this->potValue = value; }
