@@ -17,11 +17,11 @@ void ValveTask::tick() {
     case IDLE:
 
       if (this->checkAndSetJustEntered()) {
-        Logger.log("[VT] IDLE");
+        Logger.log(F("[VT] IDLE"));
       }
 
-      if (this->pContext->getValveTargetPosition() != this->currentPosition) {
-        this->targetPositionVal = this->pContext->getValveTargetPosition();
+      if (this->pContext->getReceivedValvePosition() != this->currentPosition) {
+        this->targetPositionVal = this->pContext->getReceivedValvePosition();
         this->pServo->setPosition(mapValvePosition(this->targetPositionVal));
         this->moveDuration =
             abs(this->targetPositionVal - this->currentPosition) *
@@ -33,7 +33,7 @@ void ValveTask::tick() {
 
     case MOVING:
       if (this->checkAndSetJustEntered()) {
-        Logger.log("[VT] MOVING");
+        Logger.log(F("[VT] MOVING"));
       }
 
       if (this->elapsedTimeInState() >= this->moveDuration) {
