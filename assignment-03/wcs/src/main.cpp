@@ -29,12 +29,12 @@ void setup() {
 #ifndef __TESTING_HW__
   pContext = new Context();
 
-  Task* pMsgTask = new MsgTask(pContext, &MsgService);
-  pMsgTask->init(MSG_TASK_PERIOD);
-
   Task* pSystemTask = new SystemTask(pContext, pHWPlatform->getButton(),
                                      pHWPlatform->getPotentiometer());
   pSystemTask->init(SYSTEM_TASK_PERIOD);
+
+  Task* pMsgTask = new MsgTask(pContext, &MsgService);
+  pMsgTask->init(MSG_TASK_PERIOD);
 
   Task* pValveTask = new ValveTask(pContext, pHWPlatform->getServoMotor());
   pValveTask->init(VALVE_TASK_PERIOD);
@@ -42,8 +42,8 @@ void setup() {
   Task* pLcdTask = new LCDTask(pHWPlatform->getLCD(), pContext);
   pLcdTask->init(LCD_TASK_PERIOD);
 
-  sched.addTask(pMsgTask);
   sched.addTask(pSystemTask);
+  sched.addTask(pMsgTask);
   sched.addTask(pValveTask);
   sched.addTask(pLcdTask);
 #else
