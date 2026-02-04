@@ -1,58 +1,51 @@
-#include "tasks/ValveTask.hpp"
+#include "ValveTask.hpp"
 
-#include <Arduino.h>
+#include <kernel/Logger.hpp>
 
 #include "config.hpp"
 
 ValveTask::ValveTask(Context* context, ServoMotor* servo)
     : Task(), pContext(context), pServo(servo) {
-  this->pServo->on();
   this->currentPosition = 0;
-  this->state = IDLE;
-  this->stateTimestamp = millis();
-  this->justEntered = true;
+  this->targetPositionVal = 0;
+  this->moveDuration = 0;
+  this->setState(IDLE);
 }
 
 void ValveTask::tick() {
   switch (this->state) {
     case IDLE:
-      if (this->pContext->getValveOpening() != currentPosition) {
-        setState(MOVING);
+
+      if (this->checkAndSetJustEntered()) {
+        Logger.log("[VT] IDLE");
+      }
+
+      if (this->pContext->targetPosition() != this->currentPosition) {
+        this->targetPositionVal = this->pContext->targetPosition();
+        this->pServo->setPosition(mapValvePosition(this->targetPositionVal));
+        this->moveDuration =
+            abs(this->targetPositionVal - this->currentPosition) *
+            MSEC_PER_PERCENT;
+
+        this->setState(MOVING);
       }
       break;
 
     case MOVING:
-      if (checkAndSetJustEntered()) {
-        moveValve(pContext->getValveOpening());
+      if (this->checkAndSetJustEntered()) {
+        Logger.log("[VT] MOVING");
       }
 
-      if (inPosition()) {
-        currentPosition = pContext->getValveOpening();
-        setState(IDLE);
+      if (this->elapsedTimeInState() >= this->moveDuration) {
+        this->currentPosition = this->targetPositionVal;
+        this->setState(IDLE);
       }
       break;
   }
 }
 
-void ValveTask::moveValve(int position) {
-  // Map percentage (0-100) to servo angle
-  int angle = map(position, 0, 100, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
-  this->pServo->setPosition(angle);
-}
-
-bool ValveTask::inPosition() {
-  unsigned int time =
-      abs((int)(currentPosition - pContext->getValveOpening())) *
-      MSEC_PER_PERCENT;
-  return elapsedTimeInState() >= time;
-}
-
-long ValveTask::elapsedTimeInState() { return millis() - this->stateTimestamp; }
-
-void ValveTask::setState(State s) {
-  state = s;
-  stateTimestamp = millis();
-  justEntered = true;
+uint8_t ValveTask::mapValvePosition(uint8_t position) {
+  return map(position, 0, 100, VALVE_MIN_ANGLE, VALVE_MAX_ANGLE);
 }
 
 bool ValveTask::checkAndSetJustEntered() {
@@ -61,4 +54,14 @@ bool ValveTask::checkAndSetJustEntered() {
     justEntered = false;
   }
   return bak;
+}
+
+void ValveTask::setState(State s) {
+  state = s;
+  stateTimestamp = millis();
+  justEntered = true;
+}
+
+unsigned long ValveTask::elapsedTimeInState() {
+  return millis() - stateTimestamp;
 }
