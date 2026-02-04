@@ -30,7 +30,7 @@
 
 #define JSON_UPDATE_PERIOD_MS 1000
 
-#define TIMEOUT_UNCONNECTED 3000  // ms
+#define TIMEOUT_UNCONNECTED 5000  // ms
 
 #define ALIVE "alive"
 
