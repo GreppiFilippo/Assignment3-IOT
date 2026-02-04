@@ -26,9 +26,11 @@
 #define MODE_LINE 0
 #define VALVE_LINE 1
 
-#define LCD_TASK_PERIOD 1000
+#define LCD_TASK_PERIOD 500
 
 #define JSON_UPDATE_PERIOD_MS 1000
+
+#define TIMEOUT_UNCONNECTED 3000  // ms
 
 #define ALIVE "alive"
 

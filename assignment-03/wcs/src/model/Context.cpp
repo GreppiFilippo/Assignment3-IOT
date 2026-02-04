@@ -87,7 +87,7 @@ Context::Mode Context::consumeModeCommand() {
 
 Context::Mode Context::getMode() const { return mode; }
 
-unsigned int Context::getValveOpening() const { return valveOpening; }
+unsigned int Context::getValveTargetPosition() const { return valveOpening; }
 
 bool Context::wasButtonPressed() {
   bool pressed = buttonPressed;
@@ -101,11 +101,11 @@ const char* Context::getLCDMessage() const { return lcdMessage; }
 
 // ============ State Setters ============
 
-void Context::setValveOpening(unsigned int opening) {
+void Context::setRequestedValveOpening(unsigned int opening) {
   this->valveOpening = opening;
 }
 
-void Context::setPotValue(float value) { this->potValue = value; }
+void Context::setPotValueToValidate(float value) { this->potValue = value; }
 
 void Context::setButtonPressed() { this->buttonPressed = true; }
 
@@ -118,3 +118,7 @@ void Context::setMode(Mode mode) { this->mode = mode; }
 const Context::CmdEntry* Context::getCmdTable() { return cmdTable; }
 
 int Context::getCmdTableSize() { return sizeof(cmdTable) / sizeof(CmdEntry); }
+
+unsigned long Context::getLastValidMsgTimestamp() {
+  return this->lastValidMsgTimestamp;
+}

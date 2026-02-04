@@ -2,7 +2,7 @@
 
 #include "config.hpp"
 
-static int getMappedPotValue(float potValue) { return (int)(potValue * 100.0); }
+static int getMappedPotValue(float potValue) { return (int)potValue; }
 
 SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
   this->pContext = context;
@@ -18,28 +18,35 @@ void SystemTask::tick() {
         this->pContext->setLCDMessage(LCD_UNCONNECTED);
         this->pContext->setMode(Context::UNCONNECTED);
       }
-
+      /*
+       * Handle direct valeve opening through potentiometer in unconnected mode
+       */
       this->pPot->sync();
       float potValue = this->pPot->getValue();
-      this->pContext->setValveOpening(getMappedPotValue(potValue));
+      this->pContext->setRequestedValveOpening(getMappedPotValue(potValue));
 
       if (this->pContext->hasModeCommand()) {
         Context::Mode newMode = this->pContext->consumeModeCommand();
         if (newMode == Context::MANUAL) {
           setState(MANUAL);
-          return;
+          break;
         } else if (newMode == Context::AUTOMATIC) {
           setState(AUTOMATIC);
-          return;
+          break;
         }
       }
-      break;
-    }
+    } break;
 
     case AUTOMATIC: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
         this->pContext->setMode(Context::AUTOMATIC);
+      }
+
+      if (millis() - this->pContext->getLastValidMsgTimestamp() >
+          TIMEOUT_UNCONNECTED) {
+        setState(UNCONNECTED);
+        return;
       }
 
       if (this->pBtn->wasPressed()) {
@@ -59,15 +66,20 @@ void SystemTask::tick() {
 
       if (this->pContext->hasValveCommand()) {
         unsigned int valvePos = this->pContext->consumeValveCommand();
-        this->pContext->setValveOpening(valvePos);
+        this->pContext->setRequestedValveOpening(valvePos);
       }
-      break;
-    }
+    } break;
 
     case MANUAL: {
       if (this->checkAndSetJustEntered()) {
         this->pContext->setLCDMessage(LCD_MANUAL_MODE);
         this->pContext->setMode(Context::MANUAL);
+      }
+
+      if (millis() - this->pContext->getLastValidMsgTimestamp() >
+          TIMEOUT_UNCONNECTED) {
+        setState(UNCONNECTED);
+        return;
       }
 
       if (this->pContext->hasModeCommand()) {
@@ -87,14 +99,16 @@ void SystemTask::tick() {
 
       if (this->pContext->hasValveCommand()) {
         unsigned int valvePos = this->pContext->consumeValveCommand();
-        this->pContext->setValveOpening(valvePos);
+        this->pContext->setRequestedValveOpening(valvePos);
       }
-
+      /*
+       * Handle potentiometer value changes in manual mode: data are prepared to
+       * be sent to remote cus
+       */
       this->pPot->sync();
       float potValue = this->pPot->getValue();
-      this->pContext->setPotValue(getMappedPotValue(potValue));
-      break;
-    }
+      this->pContext->setPotValueToValidate(getMappedPotValue(potValue));
+    } break;
   }
 }
 

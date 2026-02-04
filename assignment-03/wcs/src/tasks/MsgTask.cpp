@@ -93,7 +93,7 @@ void MsgTask::tick() {
     jsonDoc.clear();
     jsonDoc["event"] = "heartbeat";
     jsonDoc["mode"] = getModeString(pContext->getMode());
-    jsonDoc["valve_pos"] = pContext->getValveOpening();
+    jsonDoc["valve_pos"] = pContext->getValveTargetPosition();
     jsonDoc["uptime"] = millis();
 
     serializeJson(jsonDoc, commonBuf, sizeof(commonBuf));

@@ -11,7 +11,7 @@ LCDTask::LCDTask(LCD* lcd, Context* pContext) {
 
 void LCDTask::tick() {
   const char* msg = this->pContext->getLCDMessage();
-  float valvePos = this->pContext->getValveOpening();
+  float valvePos = this->pContext->getValveTargetPosition();
   char buf[20];
   int intPart = (int)valvePos;
   snprintf(buf, sizeof(buf), "Valve: %d%%", intPart);
