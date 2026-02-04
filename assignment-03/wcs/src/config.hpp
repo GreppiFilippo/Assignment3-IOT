@@ -24,9 +24,9 @@
 
 #define MSEC_PER_PERCENT 6
 #define MODE_LINE 0
-#define VALVE_LINE 1
+#define VALVE_LINE 2
 
-#define LCD_TASK_PERIOD 500
+#define LCD_TASK_PERIOD 100
 
 #define JSON_UPDATE_PERIOD_MS 1000
 

@@ -12,10 +12,16 @@ SystemTask::SystemTask(Context* context, Button* btn, Potentiometer* pot) {
 }
 
 void SystemTask::tick() {
+  // Update valve position on LCD
+  char buf[20];
+  unsigned int valvePos = this->pContext->getValveTargetPosition();
+  snprintf(buf, sizeof(buf), "Valve: %d%%", valvePos);
+  this->pContext->setLCDLine(VALVE_LINE, buf);
+
   switch (this->state) {
     case UNCONNECTED: {
       if (this->checkAndSetJustEntered()) {
-        this->pContext->setLCDMessage(LCD_UNCONNECTED);
+        this->pContext->setLCDLine(MODE_LINE, LCD_UNCONNECTED);
         this->pContext->setMode(Context::UNCONNECTED);
       }
       /*
@@ -39,7 +45,7 @@ void SystemTask::tick() {
 
     case AUTOMATIC: {
       if (this->checkAndSetJustEntered()) {
-        this->pContext->setLCDMessage(LCD_AUTOMATIC_MODE);
+        this->pContext->setLCDLine(MODE_LINE, LCD_AUTOMATIC_MODE);
         this->pContext->setMode(Context::AUTOMATIC);
       }
 
@@ -72,7 +78,7 @@ void SystemTask::tick() {
 
     case MANUAL: {
       if (this->checkAndSetJustEntered()) {
-        this->pContext->setLCDMessage(LCD_MANUAL_MODE);
+        this->pContext->setLCDLine(MODE_LINE, LCD_MANUAL_MODE);
         this->pContext->setMode(Context::MANUAL);
       }
 

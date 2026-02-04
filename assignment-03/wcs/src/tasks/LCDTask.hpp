@@ -6,8 +6,6 @@
 #include "kernel/Task.hpp"
 #include "model/Context.hpp"
 
-#define LCD_BUFFER_SIZE (LCD_COLS * LCD_ROWS + 1)
-
 /**
  * @brief Task to manage the LCD display.
  *
@@ -18,8 +16,7 @@ class LCDTask : public Task {
  private:
   Context* pContext;
   LCD* lcd;
-  float lastValvePos;
-  char lastMsg[LCD_BUFFER_SIZE];
+  char lastLines[LCD_ROWS][LCD_COLS + 1];
 
  public:
   /**

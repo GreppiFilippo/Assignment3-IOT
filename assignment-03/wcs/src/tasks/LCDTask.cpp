@@ -5,23 +5,23 @@
 LCDTask::LCDTask(LCD* lcd, Context* pContext) {
   this->lcd = lcd;
   this->pContext = pContext;
-  this->lastMsg[0] = '\0';  // Initialize lastMsg as empty string
-  this->lastValvePos = -1.0;
+  for (uint8_t i = 0; i < LCD_ROWS; i++) {
+    this->lastLines[i][0] = '\0';
+  }
 }
 
 void LCDTask::tick() {
-  const char* msg = this->pContext->getLCDMessage();
-  float valvePos = this->pContext->getValveTargetPosition();
-  char buf[20];
-  int intPart = (int)valvePos;
-  snprintf(buf, sizeof(buf), "Valve: %d%%", intPart);
-  if (strcmp(msg, this->lastMsg) != 0) {
-    this->lcd->print(msg, MODE_LINE);
-    strncpy(this->lastMsg, msg, sizeof(this->lastMsg) - 1);
-    this->lastMsg[sizeof(this->lastMsg) - 1] = '\0';
-  }
-  if (lastValvePos != valvePos) {
-    this->lcd->print(buf, VALVE_LINE);
-    lastValvePos = valvePos;
+  for (uint8_t line = 0; line < LCD_ROWS; line++) {
+    const char* currentMsg = pContext->getLCDLine(line);
+    
+    if (currentMsg == nullptr) {
+      continue;
+    }
+    
+    if (strcmp(currentMsg, lastLines[line]) != 0) {
+      lcd->print(currentMsg, line);
+      strncpy(lastLines[line], currentMsg, LCD_COLS);
+      lastLines[line][LCD_COLS] = '\0';
+    }
   }
 }

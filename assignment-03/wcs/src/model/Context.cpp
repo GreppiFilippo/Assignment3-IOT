@@ -16,7 +16,10 @@ Context::Context() {
   this->valveOpening = 0;
   this->potValue = 0.0;
   this->buttonPressed = false;
-  this->lcdMessage = LCD_UNCONNECTED;
+  
+  for (uint8_t i = 0; i < LCD_ROWS; i++) {
+    this->lcdLines[i][0] = '\0';
+  }
 
   // Initialize command buffers
   this->valveCmd.pending = false;
@@ -97,7 +100,12 @@ bool Context::wasButtonPressed() {
 
 float Context::getPotValue() const { return potValue; }
 
-const char* Context::getLCDMessage() const { return lcdMessage; }
+const char* Context::getLCDLine(uint8_t line) const {
+  if (line >= LCD_ROWS) {
+    return nullptr;
+  }
+  return lcdLines[line];
+}
 
 // ============ State Setters ============
 
@@ -109,7 +117,14 @@ void Context::setPotValueToValidate(float value) { this->potValue = value; }
 
 void Context::setButtonPressed() { this->buttonPressed = true; }
 
-void Context::setLCDMessage(const char* msg) { this->lcdMessage = msg; }
+void Context::setLCDLine(uint8_t line, const char* msg) {
+  if (line >= LCD_ROWS) {
+    Logger.log(F("LCD_LINE_ERR"));
+    return;
+  }
+  strncpy(lcdLines[line], msg, LCD_COLS);
+  lcdLines[line][LCD_COLS] = '\0';
+}
 
 void Context::setMode(Mode mode) { this->mode = mode; }
 

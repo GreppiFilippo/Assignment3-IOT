@@ -5,6 +5,8 @@
 
 #include <ArduinoJson.h>
 
+#include "config.hpp"
+
 /**
  * @brief Context class to hold system state and manage commands from CUS
  *
@@ -56,14 +58,13 @@ class Context {
    */
   float getPotValue() const;
 
-  // TODO: check to write into multiple lines
   /**
-   * @brief Get the LCD Message
+   * @brief Get the LCD message for a specific line
    *
-   * @return const char*
+   * @param line Line number (0-based)
+   * @return const char* Message on that line, or nullptr if invalid line
    */
-  const char* getLCDMessage() const;
-  // END TODO
+  const char* getLCDLine(uint8_t line) const;
 
   // State setters - used by tasks to update local state
   /**
@@ -89,11 +90,12 @@ class Context {
   void setButtonPressed();
 
   /**
-   * @brief Set the LCD Message
+   * @brief Set the LCD message for a specific line
    *
-   * @param msg New message to display
+   * @param line Line number (0-based)
+   * @param msg New message to display. Ignored if line is out of range.
    */
-  void setLCDMessage(const char* msg);
+  void setLCDLine(uint8_t line, const char* msg);
 
   /**
    * @brief Set the system Mode.
@@ -144,7 +146,7 @@ class Context {
   unsigned int valveOpening;
   float potValue;
   bool buttonPressed;
-  const char* lcdMessage;
+  char lcdLines[LCD_ROWS][LCD_COLS + 1];
   unsigned long lastValidMsgTimestamp;
 
   // Command table
