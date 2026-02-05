@@ -151,6 +151,14 @@ class Context {
    * JSON document
    */
   StaticJsonDocument<INPUT_JSON_SIZE>& getReceivedJson();
+
+  /**
+   * @brief Get or create a nested object in the internal JSON data
+   *
+   * @param key Key of the nested object to get or create
+   * @return JsonObject Reference to the nested object
+   */
+  JsonObject getOrCreateNestedObject(const char* key);
 };
 
 #endif

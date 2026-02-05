@@ -20,10 +20,11 @@ void SystemTask::tick() {
     this->lastButtonPressTimestamp = millis();
   }
 
-  // Set btn field: true if button pressed after last message sent
+  // Set btn nested object: { val: true|false, who: "wcs" }
   unsigned long lastMsgSent = this->pContext->getLastMsgSentTimestamp();
-  this->pContext->setField(BUTTON_PRESSED_JSON,
-                           this->lastButtonPressTimestamp > lastMsgSent);
+  JsonObject btnObj = this->pContext->getOrCreateNestedObject(BUTTON_PRESSED_JSON);
+  btnObj["val"] = this->lastButtonPressTimestamp > lastMsgSent;
+  btnObj["who"] = "wcs";
 
   this->pPot->sync();
   float potValue = this->pPot->getValue();
