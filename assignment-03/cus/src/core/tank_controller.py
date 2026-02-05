@@ -8,7 +8,7 @@ from utils.logger import get_logger
 import config
 
 # Import system states after config to avoid circular dependency
-from core.system_states import SystemStateBase, UnconnectedState
+from core.system_states import *
 
 logger = get_logger(__name__)
 
@@ -30,9 +30,13 @@ class TankController(BaseService):
         super().__init__("tank_controller", event_bus)
         
         # State management
-        self._current_state: SystemStateBase = UnconnectedState()
+        self._current_state: SystemStateBase = AutomaticSystemState()
         self._last_level_timestamp = time.time()  # Unix timestamp in seconds
-        self._who = dict()
+        
+        # Track last value from each source (who) for pot
+        self._pot_sources: dict[str, float] = {}  # {source_id: last_value}
+        self._last_pot_value: float = 0.0
+        
         # Water level history
         self._water_levels: List[LevelReading] = []
         
@@ -48,9 +52,13 @@ class TankController(BaseService):
         Event-driven FSM: reacts to events via pubsub callbacks.
         Periodic loop only checks for connectivity timeout.
         """
+        print(f"[{self.name}] 🚀 RUN LOOP STARTED")
         while self._running:
             # Check timeout (convert to milliseconds for config comparison)
-            elapsed_ms = int((time.time() - self._last_level_timestamp) * 1000)
+            current_time = time.time()
+            print(f"[{self.name}] ⏱️ Running periodic check at {current_time}, last level timestamp: {self._last_level_timestamp}")
+            elapsed_ms = int((current_time - self._last_level_timestamp) * 1000)
+            print(f"[{self.name}] ⏱️ Elapsed: {elapsed_ms}ms, checking timeout...")
             self._current_state.check_timeout(elapsed_ms, self)
             
             await asyncio.sleep(1.0)
@@ -58,14 +66,13 @@ class TankController(BaseService):
     def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
         print(f"[{self.name}] 📊 Level event received: {reading}")
+
+        # Update timestamp
         logger.info(f"[{self.name}] Level event received: {reading}")
-        
+        self._last_level_timestamp = time.time()
         # Store in history
         measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
-        
-        # Update timestamp
-        self._last_level_timestamp = measure.timestamp
         
         print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
         

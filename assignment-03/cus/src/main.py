@@ -24,16 +24,15 @@ async def main():
     bus.subscribe(LEVEL_IN_TOPIC, controller._on_level_event)
     
     # 3. Instantiate Infrastructure Adapters
-    # COMMENTED FOR TESTING - Serial Service
-    # serial_service = SerialService(
-    #     port=SERIAL_PORT, 
-    #     baudrate=SERIAL_BAUDRATE, 
-    #     event_bus=bus,
-    #     send_interval=SERIAL_SEND_INTERVAL
-    # )
+    serial_service = SerialService(
+        port=SERIAL_PORT, 
+        baudrate=SERIAL_BAUDRATE, 
+        event_bus=bus,
+        send_interval=SERIAL_SEND_INTERVAL
+    )
 
-    # bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
-    # bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
+    bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
+    bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
     
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,
@@ -82,8 +81,7 @@ async def main():
     #     }
 
     # 5. Start all services concurrently
-    # services = [controller, serial_service, mqtt_service, http_service]
-    services = [controller, mqtt_service]  # TEST: Only MQTT
+    services = [controller, serial_service, mqtt_service]  # TEST: Serial + MQTT
     
     print("=" * 80)
     print("🚀 Starting all system services...")

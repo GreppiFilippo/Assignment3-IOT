@@ -7,6 +7,7 @@ from typing import Optional, Dict, Callable, Any
 from services.event_bus import EventBus
 from .base_service import BaseService
 from utils.logger import get_logger
+from config import *
 
 logger = get_logger(__name__)
 
@@ -22,14 +23,21 @@ class SerialService(BaseService):
         self.baudrate = baudrate
         self._send_interval = send_interval
         
-        # Internal state
+        # Internal state - inizializza con valori di default
         self._serial: Optional[serial.Serial] = None
         self._read_buffer = ""
-        self._last_state_received: dict = {}
+        self._last_state_received: dict = {
+            'mode': 'UNCONNECTED',  # Valore iniziale
+            'valve_opening': 0.0     # Valore iniziale
+        }
         self._last_send_time = 0.0
         
         # Mapping from serial keys to event bus topics
-        self._pub_topics: Dict[str, str] = {}
+        self._pub_topics: Dict[str, str] = {
+            "level": "level_in",
+            "pot": "pot",
+            "btn": "btn"
+        }
         
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
@@ -114,9 +122,12 @@ class SerialService(BaseService):
             loop = asyncio.get_running_loop()
             ser = self._serial
             payload = (json.dumps(data) + '\n').encode('utf-8')
+            print(f"[{self.name}] 📤 Sending to WCS: {data}")
+            logger.debug(f"[{self.name}] Sending to WCS: {data}")
             await loop.run_in_executor(None, lambda: ser.write(payload))
             await loop.run_in_executor(None, ser.flush)
         except Exception as e:
+            print(f"[{self.name}] ❌ Write error: {e}")
             logger.error(f"[{self.name}] Write error: {e}")
             self._serial = None
 
@@ -129,8 +140,10 @@ class SerialService(BaseService):
         
     def on_mode_change(self, mode: str):
         """Update internal state based on mode changes from the Event Bus."""
-        self._last_state_received['mode'] = mode
+        print(f"[{self.name}] 🔄 Mode change received: {mode}")
+        self._last_state_received[MODE_TOPIC] = mode
 
     def on_valve_command(self, opening: float):
         """Update internal state based on valve commands from the Event Bus."""
-        self._last_state_received['valve_opening'] = opening
+        print(f"[{self.name}] 🎚️  Valve command received: {opening}")
+        self._last_state_received[OPENING_TOPIC] = opening

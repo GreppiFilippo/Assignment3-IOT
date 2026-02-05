@@ -9,7 +9,7 @@ LEVELS_OUT_TOPIC = "level_out"
 POT_TOPIC = "pot"
 MODE_TOPIC = "mode"
 MODE_CHANGE_TOPIC = "btn"
-OPENING_TOPIC = "opening"
+OPENING_TOPIC = "valve"
 
 SERIAL_SEND_INTERVAL=0.5  # Time interval to send data to Arduino (in seconds)
 
@@ -28,8 +28,8 @@ ALLOWED_HEADERS = ["*"]
 
 # === System Configuration ===
 # Water Level Thresholds (in cm)
-L1_THRESHOLD = 50.0  # First warning level
-L2_THRESHOLD = 80.0  # Critical level
+L1_THRESHOLD = 0.30  # First warning level
+L2_THRESHOLD = 0.5  # Critical level
 MAX_READINGS = 100  # Maximum number of water level readings to store
 
 # Timing Configuration (in seconds)

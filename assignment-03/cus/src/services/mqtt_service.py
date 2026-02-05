@@ -121,15 +121,14 @@ class MQTTService(BaseService):
         """Callback invoked when connected to the broker."""
         if rc == 0:
             self._connected = True
-            print(f"[{self.name}] ✅ Successfully connected to MQTT broker.")
+            # print(f"[{self.name}] ✅ Successfully connected to MQTT broker.")
             logger.info(f"[{self.name}] Successfully connected to MQTT broker.")
             # Subscribe to all mapped external topics
             for mqtt_topic in self._incoming_map.keys():
                 client.subscribe(mqtt_topic, qos=self.qos)
-                print(f"[{self.name}] 📡 Subscribed to MQTT: {mqtt_topic}")
+                # print(f"[{self.name}] 📡 Subscribed to MQTT: {mqtt_topic}")
                 logger.info(f"[{self.name}] Subscribed to MQTT: {mqtt_topic}")
         else:
-            print(f"[{self.name}] ❌ Connection failed with result code {rc}")
             logger.error(f"[{self.name}] Connection failed with result code {rc}")
 
     def _on_mqtt_disconnect(self, client, userdata, rc):
@@ -145,28 +144,21 @@ class MQTTService(BaseService):
             
             if bus_topic:
                 payload = json.loads(msg.payload.decode("utf-8"))
-                print(f"[{self.name}] 📨 MQTT message: topic={mqtt_topic}, type={type(payload).__name__}, payload={payload}")
                 logger.info(f"[{self.name}] MQTT -> Bus: {mqtt_topic} to {bus_topic}, payload type: {type(payload)}, payload: {payload}")
                 
                 # Handle different payload types
                 if isinstance(payload, dict):
                     # Fix timestamp if present (ESP sends uptime, we need absolute time)
-                    if 'reading' in payload and isinstance(payload['reading'], dict):
-                        if 'timestamp' in payload['reading']:
-                            # Replace ESP uptime with current server time
-                            payload['reading']['timestamp'] = time.time()
-                            print(f"[{self.name}] 🕐 Timestamp fixed to current time: {payload['reading']['timestamp']}")
-                    
                     # Use the injected bus to notify the rest of the system
                     self.bus.publish(bus_topic, **payload)
-                    print(f"[{self.name}] ✅ Published to bus: {bus_topic}")
+                    # print(f"[{self.name}] ✅ Published to bus: {bus_topic}")
                 else:
                     # Skip non-dict payloads (e.g., simple integers or strings)
-                    print(f"[{self.name}] ⚠️  Skipping non-dict payload: {payload}")
+                    # print(f"[{self.name}] ⚠️  Skipping non-dict payload: {payload}")
                     logger.warning(f"[{self.name}] Skipping non-dict payload from {mqtt_topic}: {payload}")
                     
         except Exception as e:
-            print(f"[{self.name}] ❌ Error processing MQTT message: {e}")
+            # print(f"[{self.name}] ❌ Error processing MQTT message: {e}")
             logger.error(f"[{self.name}] Error processing MQTT message: {e}")
 
     def _make_outgoing_handler(self, bus_topic: str):
