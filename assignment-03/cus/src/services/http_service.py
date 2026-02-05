@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Callable, Any, Dict, Optional
-import config
+from functools import partial
 
 from services.event_bus import EventBus
 from .base_service import BaseService
@@ -68,54 +68,49 @@ class HttpService(BaseService):
         
         self._server: Optional[uvicorn.Server] = None
         self._server_task: Optional[asyncio.Task] = None
-        self._setup_routes()
+        self._publish_topics: Dict[str, Callable] = {}
         logger.info(f"[{self.name}] Initialized on {host}:{port}")
 
-    def _setup_routes(self):
-        # Usiamo il riferimento a self all'interno del decoratore
-        @self._app.get("/api/v1/mode")
-        async def get_mode():
-            # Qui 'self' è accessibile perché get_mode è definita 
-            # nel raggio d'azione (scope) di _setup_routes
-            data = self._latest_received.get("mode")
-            return {
-                "mode": data,
-                "timestamp": time.time()
-            }
+    def add_get_endpoint(self, path: str, state_key: str, response_key: Optional[str] = None):
+        """
+        Add a GET endpoint that returns data from internal state.
+        :param path: URL path relative to api_prefix (e.g., "/mode")
+        :param state_key: Key in _latest_received dict
+        :param response_key: Key in response JSON (defaults to state_key)
+        """
+        if response_key is None:
+            response_key = state_key
         
-        @self._app.get("/api/v1/levels")
-        async def get_levels():
-            data = self._latest_received.get("levels", [])
-            return {
-                "levels": data,
-                "timestamp": time.time()
-            }
-        
-        @self._app.get("/api/v1/valve")
-        async def get_valve():
-            data = self._latest_received.get("valve", 0.0)
-            return {
-                "valve": data,
-                "timestamp": time.time()
-            }
-        
-        @self._app.post("/api/v1/pot")
-        async def set_valve(payload: dict):
-            """
-            Riceve un JSON tipo: {"pot":{"val": X, "who": "source_id"}}
-            E lo pubblica sull'Event Bus.
-            """
-            pot = payload.get("pot")
+        full_path = f"{self._api_prefix}{path}"
             
-            if pot is not None:
-                # PUBBLICHIAMO SUL BUS (Inverso di quello che facevi prima)
-                # Il topic sarà quello che il Controller sta ascoltando
-                self.bus.publish(config.POT_TOPIC, pot=pot)
-                
-                return {"status": "success", "sent": pot}
-            
-            return {"status": "error", "message": "Missing pot value"}, 400
+        @self._app.get(full_path)
+        async def get_endpoint():
+            data = self._latest_received.get(state_key)
+            return {
+                response_key: data,
+                "timestamp": time.time()
+            }
         
+        logger.info(f"[{self.name}] Registered GET {full_path} -> state[{state_key}]")
+    
+    def add_post_endpoint(self, path: str, bus_topic: str, payload_key: str):
+        """
+        Add a POST endpoint that publishes to the event bus.
+        :param path: URL path relative to api_prefix (e.g., "/pot")
+        :param bus_topic: Topic to publish on event bus
+        :param payload_key: Key to extract from JSON payload
+        """
+        full_path = f"{self._api_prefix}{path}"
+        
+        @self._app.post(full_path)
+        async def post_endpoint(payload: dict):
+            data = payload.get(payload_key)
+            if data is not None:
+                self.bus.publish(bus_topic, **{payload_key: data})
+                return {"status": "success", "sent": data}
+            return {"status": "error", "message": f"Missing {payload_key}"}, 400
+        
+        logger.info(f"[{self.name}] Registered POST {full_path} -> bus[{bus_topic}]")
         
     
     def configure_periodic_publishing(self, topic: str, data_generator: Callable):
@@ -180,17 +175,16 @@ class HttpService(BaseService):
             # The base class stop() will cancel the task, which triggers serve() cleanup
         await super().stop()
 
-    def on_valve_update(self, opening: float):
-        """Callback for valve updates from the Event Bus."""
-        logger.info(f"[{self.name}] Valve update received: {opening}")
-        self._latest_received["valve"] = opening
-
-    def on_mode_update(self, mode: str):
-        """Callback for mode updates from the Event Bus."""
-        logger.info(f"[{self.name}] Mode update received: {mode}")
-        self._latest_received["mode"] = mode
     
-    def on_levels_out(self, levels: deque):
-        """Callback for levels updates from the Event Bus."""
-        logger.info(f"[{self.name}] Levels update received: {levels}")
-        self._latest_received["levels"] = levels
+    def on_state_update(self, state_key: str, **kwargs):
+        """
+        Generic callback to update internal state.
+        :param state_key: Key to store in _latest_received
+        :param kwargs: Data to store
+        """
+        # If single value, extract it
+        if len(kwargs) == 1:
+            self._latest_received[state_key] = list(kwargs.values())[0]
+        else:
+            self._latest_received[state_key] = kwargs
+        logger.debug(f"[{self.name}] State updated: {state_key} = {self._latest_received[state_key]}")

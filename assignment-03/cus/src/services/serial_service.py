@@ -3,11 +3,11 @@ import json
 import serial
 import time
 from typing import Optional, Dict, Callable, Any
+from functools import partial
 
 from services.event_bus import EventBus
 from .base_service import BaseService
 from utils.logger import get_logger
-from config import *
 
 logger = get_logger(__name__)
 
@@ -23,21 +23,49 @@ class SerialService(BaseService):
         self.baudrate = baudrate
         self._send_interval = send_interval
         
-        # Internal state - inizializza con valori di default
+        # Internal state
         self._serial: Optional[serial.Serial] = None
         self._read_buffer = ""
-        self._last_state_received: dict = {
-            'mode': 'UNCONNECTED',  # Valore iniziale
-            'valve': 0.0     # Valore iniziale
-        }
+        self._last_state_to_send: dict = {}
         self._last_send_time = 0.0
         
-        # Mapping from serial keys to event bus topics
-        self._pub_topics: Dict[str, str] = {
-            "pot": "pot",
-            "btn": "btn"
-        }
+        # Mapping from serial keys to event bus topics (configurable)
+        self._incoming_map: Dict[str, str] = {}  # {"pot": "pot_topic"}
+        self._state_keys: list = []  # ["mode", "valve"] - keys to send to hardware
         
+    def configure_messaging(self, incoming: Optional[Dict[str, str]] = None, 
+                           outgoing_state_keys: Optional[list] = None, 
+                           initial_state: Optional[dict] = None):
+        """
+        Configure serial communication mappings.
+        :param incoming: Map of {"serial_key": "bus_topic"} for data from hardware
+        :param outgoing_state_keys: List of state keys to send to hardware
+        :param initial_state: Initial state dict to send to hardware
+        """
+        if incoming:
+            self._incoming_map = incoming
+            logger.info(f"[{self.name}] Incoming map: {incoming}")
+        
+        if outgoing_state_keys:
+            self._state_keys = outgoing_state_keys
+            logger.info(f"[{self.name}] State keys to send: {outgoing_state_keys}")
+        
+        if initial_state:
+            self._last_state_to_send = initial_state
+            logger.info(f"[{self.name}] Initial state: {initial_state}")
+    
+    def on_state_change(self, state_key: str, **kwargs):
+        """
+        Generic callback to update state to send to hardware.
+        :param state_key: Key in the state dict
+        :param kwargs: Data (if single value, extract it)
+        """
+        if len(kwargs) == 1:
+            self._last_state_to_send[state_key] = list(kwargs.values())[0]
+        else:
+            self._last_state_to_send[state_key] = kwargs
+        logger.debug(f"[{self.name}] State updated: {state_key} = {self._last_state_to_send[state_key]}")
+    
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
         try:
@@ -65,7 +93,7 @@ class SerialService(BaseService):
                 # 2. Periodic Write to Hardware (Heartbeat/State sync)
                 now = time.monotonic()
                 if now - self._last_send_time >= self._send_interval:
-                    await self._write_serial_data(self._last_state_received)
+                    await self._write_serial_data(self._last_state_to_send)
                     self._last_send_time = now
 
             except Exception as e:
@@ -96,18 +124,14 @@ class SerialService(BaseService):
 
     async def _process_incoming_line(self, line: str):
         """Parse JSON from hardware and publish to the Event Bus."""
-        if not line or not self._pub_topics: return
+        if not line or not self._incoming_map: return
         try:
             data = json.loads(line)
             for key, value in data.items():
-                if key in self._pub_topics:
-                    # Ottieni il nome reale (es. "water_level") associato alla chiave (es. "w")
-                    actual_param_name = self._pub_topics[key]
-                    
-                    # Crea un dizionario dinamico e spacchettalo con **
-                    self.bus.publish(key, **{actual_param_name: value})
-                    
-                    logger.debug(f"Published to {key}: {actual_param_name}={value}")
+                if key in self._incoming_map:
+                    bus_topic = self._incoming_map[key]
+                    self.bus.publish(bus_topic, **{key: value})
+                    logger.debug(f"Published to {bus_topic}: {key}={value}")
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 
@@ -132,20 +156,3 @@ class SerialService(BaseService):
         if self._serial:
             self._serial.close()
             logger.info(f"[{self.name}] Serial port closed.")
-
-        
-    def on_mode_change(self, mode: str):
-        """Update internal state based on mode changes from the Event Bus."""
-        # Convert enum to string if necessary
-        if hasattr(mode, 'value'):
-            mode_str = mode.value
-        else:
-            mode_str = str(mode)
-        
-        print(f"[{self.name}] 🔄 Mode change received: {mode_str}")
-        self._last_state_received['mode'] = mode_str
-
-    def on_valve_command(self, opening: float):
-        """Update internal state based on valve commands from the Event Bus."""
-        print(f"[{self.name}] 🎚️  Valve command received: {opening}")
-        self._last_state_received['valve'] = opening
