@@ -41,6 +41,13 @@ async def main():
         qos=1
     )
     
+    # Configure MQTT to only receive messages from broker
+    mqtt_service.configure_messaging(
+        incoming={
+            "tank/level": LEVEL_IN_TOPIC,  # MQTT tank/level -> bus level_in
+        }
+    )
+    
     http_service = HttpService(
         event_bus=bus,
         host=HTTP_HOST,

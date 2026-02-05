@@ -134,7 +134,7 @@ class MQTTService(BaseService):
             
             if bus_topic:
                 payload = json.loads(msg.payload.decode("utf-8"))
-                logger.debug(f"[{self.name}] MQTT -> Bus: {mqtt_topic} to {bus_topic}")
+                logger.info(f"[{self.name}] MQTT -> Bus: {mqtt_topic} to {bus_topic}, payload type: {type(payload)}, payload: {payload}")
                 # Use the injected bus to notify the rest of the system
                 self.bus.publish(bus_topic, **payload)
         except Exception as e:

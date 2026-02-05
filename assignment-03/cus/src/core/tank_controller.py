@@ -31,7 +31,7 @@ class TankController(BaseService):
         
         # State management
         self._current_state: SystemStateBase = UnconnectedState()
-        self._last_level_timestamp = int(time.monotonic() * 1000)
+        self._last_level_timestamp = time.time()  # Unix timestamp in seconds
         
         # Water level history
         self._water_levels: List[LevelReading] = []
@@ -49,8 +49,8 @@ class TankController(BaseService):
         Periodic loop only checks for connectivity timeout.
         """
         while self._running:
-            # Check timeout
-            elapsed_ms = int(time.monotonic() * 1000) - self._last_level_timestamp
+            # Check timeout (convert to milliseconds for config comparison)
+            elapsed_ms = int((time.time() - self._last_level_timestamp) * 1000)
             self._current_state.check_timeout(elapsed_ms, self)
             
             await asyncio.sleep(1.0)
@@ -58,14 +58,14 @@ class TankController(BaseService):
     def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
         # Store in history
-        measure = LevelReading(reading["level"], reading["timestamp"])
+        measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
         
         # Update timestamp
         self._last_level_timestamp = measure.timestamp
         
         # Delegate to state
-        self._current_state.handle_level_event(measure.level, measure.timestamp, self)
+        self._current_state.handle_level_event(measure.water_level, measure.timestamp, self)
 
     def _on_button_pressed(self):
         """Delegate button.pressed event to current state."""

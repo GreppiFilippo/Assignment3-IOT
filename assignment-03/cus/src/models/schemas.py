@@ -45,7 +45,7 @@ class LevelReading(BaseModel):
     Water level reading from the sensor.
     """
     water_level: float
-    timestamp: datetime
+    timestamp: float  # Unix timestamp in seconds
 
 
 class StatusResponse(BaseModel):

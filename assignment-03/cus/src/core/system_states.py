@@ -79,7 +79,7 @@ class UnconnectedState(SystemStateBase):
     
     def on_enter(self, controller: 'TankController'):
         logger.info("Entered UNCONNECTED state")
-        controller.bus.publish(config.MODE_TOPIC, state=SystemStateEnum.UNCONNECTED)
+        controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.UNCONNECTED)
 
 
 class ManualState(SystemStateBase):
@@ -111,7 +111,7 @@ class ManualState(SystemStateBase):
     
     def on_enter(self, controller: 'TankController'):
         logger.info("Entered MANUAL mode")
-        controller.bus.publish(config.MODE_TOPIC, state=SystemStateEnum.MANUAL)
+        controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.MANUAL)
 
 
 class AutomaticSystemState(SystemStateBase):
@@ -153,7 +153,7 @@ class AutomaticSystemState(SystemStateBase):
         self._current_substate = NormalSubState()
         self._substate_timestamp = int(time.monotonic() * 1000)
         self._current_substate.on_enter(controller)
-        controller.bus.publish(config.MODE_TOPIC, state=SystemStateEnum.AUTOMATIC)
+        controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.AUTOMATIC)
     
     def _transition_substate(self, new_substate: AutomaticSubStateBase, controller: 'TankController'):
         """Internal: transition between automatic substates."""
