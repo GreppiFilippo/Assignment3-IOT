@@ -74,6 +74,10 @@ void SystemTask::tick() {
         if (strcmp(mode, MODE_UNCONNECTED) == 0) {
           setState(UNCONNECTED);
           break;
+        } else if (strcmp(mode, MODE_AUTOMATIC) == 0) {
+          this->pContext->setLCDLine(MODE_LINE, LCD_AUTOMATIC_MODE);
+        } else if (strcmp(mode, MODE_MANUAL) == 0) {
+          this->pContext->setLCDLine(MODE_LINE, LCD_MANUAL_MODE);
         }
       }
       /*
