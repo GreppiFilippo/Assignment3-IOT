@@ -81,3 +81,10 @@ bool Context::consumeButtonPressed() {
 StaticJsonDocument<INPUT_JSON_SIZE>& Context::getReceivedJson() {
   return receivedJson;
 }
+
+JsonObject Context::getOrCreateNestedObject(const char* key) {
+  if (!jsonDoc.containsKey(key)) {
+    return jsonDoc.createNestedObject(key);
+  }
+  return jsonDoc[key].as<JsonObject>();
+}

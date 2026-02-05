@@ -58,5 +58,4 @@ SystemState <|-- UnconnectedState
 TankController --|> CusEventBus : "publishes VALVE_CMD / STATE_CHANGE"
 CusEventBus ..> SerialAdapter : "notifies {mode, valve}"
 CusEventBus ..> HttpAdapter : "notifies {mode, valve, lvl}"
-CusEventBus ..> MqttAdapter : "notifies"
 @enduml
