@@ -11,6 +11,8 @@ MODE_TOPIC = "mode"
 MODE_CHANGE_TOPIC = "btn"
 OPENING_TOPIC = "valve"
 
+TOLERANCE = 1 #tolerance for pot changes
+
 SERIAL_SEND_INTERVAL=0.5  # Time interval to send data to Arduino (in seconds)
 
 

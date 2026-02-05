@@ -1,5 +1,6 @@
 import asyncio
 import signal
+import time
 from services.event_bus import EventBus
 from services.serial_service import SerialService
 from services.mqtt_service import MQTTService
@@ -48,40 +49,23 @@ async def main():
         }
     )
     
-    # COMMENTED FOR TESTING - HTTP Service
-    # http_service = HttpService(
-    #     event_bus=bus,
-    #     host=HTTP_HOST,
-    #     port=HTTP_PORT,
-    #     publish_interval=10.0,
-    #     api_prefix="/api/v1"
-    # )
+    http_service = HttpService(
+        event_bus=bus,
+        host=HTTP_HOST,
+        port=HTTP_PORT,
+        publish_interval=10.0,
+        api_prefix="/api/v1"
+    )
 
+    bus.subscribe(LEVELS_OUT_TOPIC, http_service.on_levels_out)
+    bus.subscribe(MODE_TOPIC, http_service.on_mode_update)
+    bus.subscribe(OPENING_TOPIC, http_service.on_valve_update)
     
-    # # Map topics to REST endpoints
-    # http_service.map_topic_to_endpoint(OPENING_TOPIC, "POST")
-    # http_service.map_topic_to_endpoint(MODE_CHANGE_TOPIC, "POST")
+    # Map topics to REST endpoints
+    # POST endpoints - ricevono dati HTTP e li pubblicano sul bus        # POST /api/v1/pot - invia comando pot
     
-    # # Add status endpoint
-    # @http_service._app.get("/api/v1/status")
-    # async def get_status():
-    #     """Get current system status."""
-    #     state = controller.state
-        
-    #     # Get substate if in AUTOMATIC
-    #     substate = None
-    #     if isinstance(controller._current_state, AutomaticSystemState):
-    #         substate = controller._current_state.current_substate.get_state_name().value
-        
-    #     return {
-    #         "system_state": state.value,
-    #         "automatic_substate": substate,
-    #         "current_level": controller.current_level,
-    #         "water_levels_count": len(controller.water_levels)
-    #     }
-
     # 5. Start all services concurrently
-    services = [controller, serial_service, mqtt_service]  # TEST: Serial + MQTT
+    services = [controller, serial_service, mqtt_service, http_service]  # TEST: Serial + MQTT
     
     print("=" * 80)
     print("🚀 Starting all system services...")
