@@ -29,11 +29,7 @@ class SerialService(BaseService):
         self._last_send_time = 0.0
         
         # Mapping from serial keys to event bus topics
-        self._pub_topics: Dict[str, str] = {
-            "level": "level_in",
-            "pot": "pot",
-            "btn": "btn"
-        }
+        self._pub_topics: Dict[str, str] = {}
         
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
@@ -96,34 +92,18 @@ class SerialService(BaseService):
         if not line or not self._pub_topics: return
         try:
             data = json.loads(line)
-            
-            # Publish based on received data
-            for serial_key, bus_topic in self._pub_topics.items():
-                if serial_key in data:
-                    value = data[serial_key]
+            for key, value in data.items():
+                if key in self._pub_topics:
+                    # Ottieni il nome reale (es. "water_level") associato alla chiave (es. "w")
+                    actual_param_name = self._pub_topics[key]
                     
-                    if bus_topic == "level_in":
-                        # Controller expects: _on_level_event(reading: dict)
-                        # reading should have "level" and "timestamp"
-                        import time
-                        reading = {
-                            "level": value,
-                            "timestamp": time.time()
-                        }
-                        self.bus.publish(bus_topic, reading=reading)
-                    elif bus_topic == "pot":
-                        # Controller expects: _on_manual_valve(value: float)
-                        self.bus.publish(bus_topic, value=value)
-                    elif bus_topic == "btn":
-                        # Controller expects: _on_button_pressed() - no parameters
-                        if value:  # Only trigger on button press (value=1 or True)
-                            self.bus.publish(bus_topic)
-                    else:
-                        # Generic fallback
-                        self.bus.publish(bus_topic, **{serial_key: value})
-                        
-                    logger.debug(f"[{self.name}] Published {serial_key} → {bus_topic}: {value}")
+                    # Crea un dizionario dinamico e spacchettalo con **
+                    self.bus.publish(key, **{actual_param_name: value})
                     
+                    logger.debug(f"Published to {key}: {actual_param_name}={value}")
+        except json.JSONDecodeError:
+            logger.warning(f"[{self.name}] Invalid JSON received: {line}")
+                      
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 

@@ -72,19 +72,26 @@ class MQTTService(BaseService):
 
     async def setup(self):
         """Establish connection with the MQTT broker."""
+        print(f"[{self.name}] setup() called - incoming map: {self._incoming_map}")
+        logger.info(f"[{self.name}] setup() called - incoming map: {self._incoming_map}")
         try:
+            print(f"[{self.name}] Attempting to connect to broker {self.broker}:{self.port}...")
+            logger.info(f"[{self.name}] Attempting to connect to broker {self.broker}:{self.port}...")
             # Connect using the thread executor to prevent blocking the event loop
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, lambda: self._client.connect(self.broker, self.port, keepalive=60))
             
             # Start the background threaded loop provided by paho-mqtt
             self._client.loop_start()
-            logger.info(f"[{self.name}] Connecting to broker {self.broker}:{self.port}...")
+            print(f"[{self.name}] MQTT loop started, waiting for connection callback...")
+            logger.info(f"[{self.name}] MQTT loop started, waiting for connection callback...")
         except Exception as e:
+            print(f"[{self.name}] Failed to connect to MQTT broker: {e}")
             logger.error(f"[{self.name}] Failed to connect to MQTT broker: {e}")
 
     async def run(self):
         """Monitor connection status and maintain the service alive."""
+        logger.info(f"[{self.name}] run() started, entering main loop...")
         while self._running:
             if self._connected:
                 # Pubblicazione periodica
@@ -96,6 +103,7 @@ class MQTTService(BaseService):
                 # Connection logic is handled by paho's loop_start auto-reconnect
                 await asyncio.sleep(5)
             await asyncio.sleep(1)
+        logger.info(f"[{self.name}] run() exiting...")
     
     async def _periodic_publish(self):
         """Pubblica periodicamente i dati in cache su MQTT."""
@@ -113,12 +121,15 @@ class MQTTService(BaseService):
         """Callback invoked when connected to the broker."""
         if rc == 0:
             self._connected = True
+            print(f"[{self.name}] ✅ Successfully connected to MQTT broker.")
             logger.info(f"[{self.name}] Successfully connected to MQTT broker.")
             # Subscribe to all mapped external topics
             for mqtt_topic in self._incoming_map.keys():
                 client.subscribe(mqtt_topic, qos=self.qos)
+                print(f"[{self.name}] 📡 Subscribed to MQTT: {mqtt_topic}")
                 logger.info(f"[{self.name}] Subscribed to MQTT: {mqtt_topic}")
         else:
+            print(f"[{self.name}] ❌ Connection failed with result code {rc}")
             logger.error(f"[{self.name}] Connection failed with result code {rc}")
 
     def _on_mqtt_disconnect(self, client, userdata, rc):
@@ -134,10 +145,28 @@ class MQTTService(BaseService):
             
             if bus_topic:
                 payload = json.loads(msg.payload.decode("utf-8"))
+                print(f"[{self.name}] 📨 MQTT message: topic={mqtt_topic}, type={type(payload).__name__}, payload={payload}")
                 logger.info(f"[{self.name}] MQTT -> Bus: {mqtt_topic} to {bus_topic}, payload type: {type(payload)}, payload: {payload}")
-                # Use the injected bus to notify the rest of the system
-                self.bus.publish(bus_topic, **payload)
+                
+                # Handle different payload types
+                if isinstance(payload, dict):
+                    # Fix timestamp if present (ESP sends uptime, we need absolute time)
+                    if 'reading' in payload and isinstance(payload['reading'], dict):
+                        if 'timestamp' in payload['reading']:
+                            # Replace ESP uptime with current server time
+                            payload['reading']['timestamp'] = time.time()
+                            print(f"[{self.name}] 🕐 Timestamp fixed to current time: {payload['reading']['timestamp']}")
+                    
+                    # Use the injected bus to notify the rest of the system
+                    self.bus.publish(bus_topic, **payload)
+                    print(f"[{self.name}] ✅ Published to bus: {bus_topic}")
+                else:
+                    # Skip non-dict payloads (e.g., simple integers or strings)
+                    print(f"[{self.name}] ⚠️  Skipping non-dict payload: {payload}")
+                    logger.warning(f"[{self.name}] Skipping non-dict payload from {mqtt_topic}: {payload}")
+                    
         except Exception as e:
+            print(f"[{self.name}] ❌ Error processing MQTT message: {e}")
             logger.error(f"[{self.name}] Error processing MQTT message: {e}")
 
     def _make_outgoing_handler(self, bus_topic: str):

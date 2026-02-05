@@ -32,7 +32,7 @@ class TankController(BaseService):
         # State management
         self._current_state: SystemStateBase = UnconnectedState()
         self._last_level_timestamp = time.time()  # Unix timestamp in seconds
-        
+        self._who = dict()
         # Water level history
         self._water_levels: List[LevelReading] = []
         
@@ -57,6 +57,9 @@ class TankController(BaseService):
 
     def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
+        print(f"[{self.name}] 📊 Level event received: {reading}")
+        logger.info(f"[{self.name}] Level event received: {reading}")
+        
         # Store in history
         measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
@@ -64,16 +67,21 @@ class TankController(BaseService):
         # Update timestamp
         self._last_level_timestamp = measure.timestamp
         
+        print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
+        
         # Delegate to state
         self._current_state.handle_level_event(measure.water_level, measure.timestamp, self)
 
-    def _on_button_pressed(self):
+    def _on_button_pressed(self, btn):
         """Delegate button.pressed event to current state."""
         self._current_state.handle_button_pressed(self)
 
-    def _on_manual_valve(self, value: float):
+    def _on_manual_valve(self, pot: dict):
         """Delegate manual.valve_command event to current state."""
-        opening = value
+        if self._who.get(who) != value:
+            logger.info(f"Manual valve command from {who}: {value}")
+            self._who[who] = value
+            opening = value
         self._current_state.handle_manual_valve(opening, self)
 
     def transition_to(self, new_state: SystemStateBase):

@@ -16,7 +16,8 @@ void Context::setWaterLevel(float level, unsigned long timestamp)
 
     // Costruzione JSON
     char payload[PAYLOAD_SIZE];
-    snprintf(payload, PAYLOAD_SIZE, "{\"level\":%.2f,\"timestamp\":%lu}", level, timestamp);
+    snprintf(payload, PAYLOAD_SIZE, "{\"reading\":{\"level\":%.2f,\"timestamp\":%lu}}", level,
+             timestamp);
 
     addMessage(MQTT_TOPIC_LEVEL, payload);
 }

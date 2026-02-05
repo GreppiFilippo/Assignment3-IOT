@@ -24,15 +24,16 @@ async def main():
     bus.subscribe(LEVEL_IN_TOPIC, controller._on_level_event)
     
     # 3. Instantiate Infrastructure Adapters
-    serial_service = SerialService(
-        port=SERIAL_PORT, 
-        baudrate=SERIAL_BAUDRATE, 
-        event_bus=bus,
-        send_interval=SERIAL_SEND_INTERVAL
-    )
+    # COMMENTED FOR TESTING - Serial Service
+    # serial_service = SerialService(
+    #     port=SERIAL_PORT, 
+    #     baudrate=SERIAL_BAUDRATE, 
+    #     event_bus=bus,
+    #     send_interval=SERIAL_SEND_INTERVAL
+    # )
 
-    bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
-    bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
+    # bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
+    # bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
     
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,
@@ -48,41 +49,48 @@ async def main():
         }
     )
     
-    http_service = HttpService(
-        event_bus=bus,
-        host=HTTP_HOST,
-        port=HTTP_PORT,
-        publish_interval=10.0,
-        api_prefix="/api/v1"
-    )
+    # COMMENTED FOR TESTING - HTTP Service
+    # http_service = HttpService(
+    #     event_bus=bus,
+    #     host=HTTP_HOST,
+    #     port=HTTP_PORT,
+    #     publish_interval=10.0,
+    #     api_prefix="/api/v1"
+    # )
 
     
-    # Map topics to REST endpoints
-    http_service.map_topic_to_endpoint(OPENING_TOPIC, "POST")
-    http_service.map_topic_to_endpoint(MODE_CHANGE_TOPIC, "POST")
+    # # Map topics to REST endpoints
+    # http_service.map_topic_to_endpoint(OPENING_TOPIC, "POST")
+    # http_service.map_topic_to_endpoint(MODE_CHANGE_TOPIC, "POST")
     
-    # Add status endpoint
-    @http_service._app.get("/api/v1/status")
-    async def get_status():
-        """Get current system status."""
-        state = controller.state
+    # # Add status endpoint
+    # @http_service._app.get("/api/v1/status")
+    # async def get_status():
+    #     """Get current system status."""
+    #     state = controller.state
         
-        # Get substate if in AUTOMATIC
-        substate = None
-        if isinstance(controller._current_state, AutomaticSystemState):
-            substate = controller._current_state.current_substate.get_state_name().value
+    #     # Get substate if in AUTOMATIC
+    #     substate = None
+    #     if isinstance(controller._current_state, AutomaticSystemState):
+    #         substate = controller._current_state.current_substate.get_state_name().value
         
-        return {
-            "system_state": state.value,
-            "automatic_substate": substate,
-            "current_level": controller.current_level,
-            "water_levels_count": len(controller.water_levels)
-        }
+    #     return {
+    #         "system_state": state.value,
+    #         "automatic_substate": substate,
+    #         "current_level": controller.current_level,
+    #         "water_levels_count": len(controller.water_levels)
+    #     }
 
     # 5. Start all services concurrently
-    services = [controller, serial_service, mqtt_service, http_service]
+    # services = [controller, serial_service, mqtt_service, http_service]
+    services = [controller, mqtt_service]  # TEST: Only MQTT
     
+    print("=" * 80)
+    print("🚀 Starting all system services...")
+    print(f"Services to start: {[s.name for s in services]}")
+    print("=" * 80)
     logger.info("🚀 Starting all system services...")
+    logger.info(f"Services to start: {[s.name for s in services]}")
     await asyncio.gather(*(service.start() for service in services))
 
     # 6. Graceful shutdown handler
