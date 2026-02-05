@@ -14,8 +14,8 @@ const State = {
 };
 
 // API endpoints
-const API_BASE = "http://localhost:8000/api";
-const ENDPOINT_READINGS = `${API_BASE}/readings`;
+const API_BASE = "http://localhost:8000/api/v1";
+const ENDPOINT_READINGS = `${API_BASE}/levels`;
 const ENDPOINT_STATUS = `${API_BASE}/status`;
 const ENDPOINT_MODE = `${API_BASE}/mode`;
 const ENDPOINT_VALVE = `${API_BASE}/valve`;
@@ -93,13 +93,13 @@ async function postJson(url, data) {
 function showToast(title, message, type = 'success') {
     toastTitle.textContent = title;
     toastBody.textContent = message;
-    
+
     const toastHeader = actionToast.querySelector('.toast-header');
     toastHeader.className = 'toast-header';
-    
+
     // Update icon based on type
     toastIcon.className = 'me-2';
-    
+
     if (type === 'error') {
         toastHeader.classList.add('bg-danger', 'text-white');
         toastIcon.classList.add('bi', 'bi-exclamation-triangle-fill');
@@ -110,7 +110,7 @@ function showToast(title, message, type = 'success') {
         toastHeader.classList.add('bg-info', 'text-white');
         toastIcon.classList.add('bi', 'bi-info-circle-fill');
     }
-    
+
     const toast = new bootstrap.Toast(actionToast);
     toast.show();
 }
@@ -319,7 +319,7 @@ async function sendValve() {
  */
 function toggleAutoRefresh() {
     autoRefreshEnabled = !autoRefreshEnabled;
-    
+
     if (autoRefreshEnabled) {
         toggleRefreshBtn.className = "btn btn-success";
         toggleRefreshBtn.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
