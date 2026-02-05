@@ -10,7 +10,7 @@ from utils.logger import get_logger
 import config
 
 if TYPE_CHECKING:
-    from core.tank_controller import TankController
+    from src.services.tank_service import TankService
 
 logger = get_logger(__name__)
 
@@ -27,30 +27,30 @@ class SystemStateBase(ABC):
         pass
     
     @abstractmethod
-    def handle_level_event(self, level: float, timestamp: float, controller: 'TankController'):
+    def handle_level_event(self, level: float, timestamp: float, controller: 'TankService'):
         """Handle sensor.level event."""
         pass
     
     @abstractmethod
-    def handle_button_pressed(self, controller: 'TankController'):
+    def handle_button_pressed(self, controller: 'TankService'):
         """Handle button.pressed event."""
         pass
     
     @abstractmethod
-    def handle_manual_valve(self, opening: float, controller: 'TankController'):
+    def handle_manual_valve(self, opening: float, controller: 'TankService'):
         """Handle manual.valve_command event."""
         pass
     
     @abstractmethod
-    def check_timeout(self, elapsed_ms: int, controller: 'TankController'):
+    def check_timeout(self, elapsed_ms: int, controller: 'TankService'):
         """Check for timeouts (called periodically)."""
         pass
     
-    def on_enter(self, controller: 'TankController'):
+    def on_enter(self, controller: 'TankService'):
         """Called when entering this state."""
         pass
     
-    def on_exit(self, controller: 'TankController'):
+    def on_exit(self, controller: 'TankService'):
         """Called when exiting this state."""
         pass
 
@@ -64,20 +64,20 @@ class UnconnectedState(SystemStateBase):
     def get_state_name(self) -> SystemStateEnum:
         return SystemStateEnum.UNCONNECTED
     
-    def handle_level_event(self, level: float, timestamp: float, controller: 'TankController'):
+    def handle_level_event(self, level: float, timestamp: float, controller: 'TankService'):
         logger.info(f"First level received ({level}cm) → AUTOMATIC")
         controller.transition_to(AutomaticSystemState())
     
-    def handle_button_pressed(self, controller: 'TankController'):
+    def handle_button_pressed(self, controller: 'TankService'):
         logger.debug("Button ignored in UNCONNECTED state")
     
-    def handle_manual_valve(self, opening: float, controller: 'TankController'):
+    def handle_manual_valve(self, opening: float, controller: 'TankService'):
         logger.debug("Manual valve ignored in UNCONNECTED state")
     
-    def check_timeout(self, elapsed_ms: int, controller: 'TankController'):
+    def check_timeout(self, elapsed_ms: int, controller: 'TankService'):
         pass  # No timeout in UNCONNECTED
     
-    def on_enter(self, controller: 'TankController'):
+    def on_enter(self, controller: 'TankService'):
         logger.info("Entered UNCONNECTED state")
         controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.UNCONNECTED)
 
@@ -91,25 +91,25 @@ class ManualState(SystemStateBase):
     def get_state_name(self) -> SystemStateEnum:
         return SystemStateEnum.MANUAL
     
-    def handle_level_event(self, level: float, timestamp: float, controller: 'TankController'):
+    def handle_level_event(self, level: float, timestamp: float, controller: 'TankService'):
         # Still monitor level, but don't act on it
         pass
     
-    def handle_button_pressed(self, controller: 'TankController'):
+    def handle_button_pressed(self, controller: 'TankService'):
         logger.info("Button pressed: MANUAL → AUTOMATIC")
         controller.transition_to(AutomaticSystemState())
     
-    def handle_manual_valve(self, opening: float, controller: 'TankController'):
+    def handle_manual_valve(self, opening: float, controller: 'TankService'):
         logger.debug(f"Manual valve command: {opening}%") #TODO fix control logic
         controller.bus.publish(config.OPENING_TOPIC, opening=opening)
     
-    def check_timeout(self, elapsed_ms: int, controller: 'TankController'):
+    def check_timeout(self, elapsed_ms: int, controller: 'TankService'):
         # Check T2 timeout
         if elapsed_ms > config.T2_TIMEOUT * 1000:
             logger.warning(f"T2 timeout in MANUAL → UNCONNECTED")
             controller.transition_to(UnconnectedState())
     
-    def on_enter(self, controller: 'TankController'):
+    def on_enter(self, controller: 'TankService'):
         logger.info("Entered MANUAL mode")
         controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.MANUAL)
 
@@ -127,7 +127,7 @@ class AutomaticSystemState(SystemStateBase):
     def get_state_name(self) -> SystemStateEnum:
         return SystemStateEnum.AUTOMATIC
     
-    def handle_level_event(self, level: float, timestamp: float, controller: 'TankController'):
+    def handle_level_event(self, level: float, timestamp: float, controller: 'TankService'):
         # Evaluate substate transition
         elapsed_ms = int(time.monotonic() * 1000) - self._substate_timestamp
         new_substate = self._current_substate.evaluate_transition(level, elapsed_ms)
@@ -135,27 +135,27 @@ class AutomaticSystemState(SystemStateBase):
         if new_substate is not None:
             self._transition_substate(new_substate, controller)
     
-    def handle_button_pressed(self, controller: 'TankController'):
+    def handle_button_pressed(self, controller: 'TankService'):
         logger.info("Button pressed: AUTOMATIC → MANUAL")
         controller.transition_to(ManualState())
     
-    def handle_manual_valve(self, opening: float, controller: 'TankController'):
+    def handle_manual_valve(self, opening: float, controller: 'TankService'):
         logger.debug("Manual valve ignored in AUTOMATIC mode")
     
-    def check_timeout(self, elapsed_ms: int, controller: 'TankController'):
+    def check_timeout(self, elapsed_ms: int, controller: 'TankService'):
         # Check T2 timeout
         if elapsed_ms > config.T2_TIMEOUT * 1000:
             logger.warning(f"T2 timeout in AUTOMATIC → UNCONNECTED")
             controller.transition_to(UnconnectedState())
     
-    def on_enter(self, controller: 'TankController'):
+    def on_enter(self, controller: 'TankService'):
         logger.info("Entered AUTOMATIC mode")
         self._current_substate = NormalSubState()
         self._substate_timestamp = int(time.monotonic() * 1000)
         self._current_substate.on_enter(controller)
         controller.bus.publish(config.MODE_TOPIC, mode=SystemStateEnum.AUTOMATIC)
     
-    def _transition_substate(self, new_substate: AutomaticSubStateBase, controller: 'TankController'):
+    def _transition_substate(self, new_substate: AutomaticSubStateBase, controller: 'TankService'):
         """Internal: transition between automatic substates."""
         self._current_substate = new_substate
         self._substate_timestamp = int(time.monotonic() * 1000)

@@ -16,9 +16,11 @@ const State = {
 // API endpoints
 const API_BASE = "http://localhost:8000/api/v1";
 const ENDPOINT_READINGS = `${API_BASE}/levels`;
-const ENDPOINT_STATUS = `${API_BASE}/status`;
+const ENDPOINT_CHANGE = `${API_BASE}/change`;
 const ENDPOINT_MODE = `${API_BASE}/mode`;
 const ENDPOINT_VALVE = `${API_BASE}/valve`;
+const ENDPOINT_POT = `${API_BASE}/pot`;
+const WHO = "dbs"
 
 /* ===== STATE ===== */
 let autoRefreshEnabled = true;
@@ -205,12 +207,6 @@ async function fetchLatest() {
         systemState.textContent = currentState;
         valveOpening.textContent = currentValve !== undefined ? `${currentValve}%` : "--";
 
-        // Sync slider with current valve opening ONLY if user is not interacting
-        if (!userInteractingWithSlider && currentValve !== null && currentValve !== undefined) {
-            valveSlider.value = currentValve;
-            sliderValue.textContent = `${currentValve}`;
-        }
-
         updateSystemStateBadge(currentState);
         updateManualControls(currentState);
         updateLastUpdateTimestamp();
@@ -274,17 +270,10 @@ function updateManualControls(mode) {
  */
 async function switchMode() {
     try {
-        const statusResponse = await fetch(ENDPOINT_STATUS);
-        if (!statusResponse.ok) throw new Error("No status");
-        const status = await statusResponse.json();
-
-        const newMode = (status.mode === State.MANUAL) ? State.AUTOMATIC : State.MANUAL;
-
-        const response = await postJson(ENDPOINT_MODE, { mode: newMode });
+        const response = await postJson(ENDPOINT_CHANGE, { btn: true });
         if (!response.ok) throw new Error("Failed to switch mode");
-
         await fetchLatest();
-        showToast("Mode Changed", `Switched to ${newMode} mode`, 'success');
+        showToast("Mode Changed", `Switched mode`, 'success');
     } catch (error) {
         console.error("Error switching mode:", error);
         showToast("Error", "Failed to switch mode", 'error');
@@ -299,7 +288,7 @@ async function switchMode() {
  * @async
  * @returns {Promise<void>}
  */
-async function sendValve() {
+async function sendPot() {
     const opening = parseInt(valveSlider.value);
 
     if (isNaN(opening) || opening < 0 || opening > 100) {
@@ -309,7 +298,12 @@ async function sendValve() {
     }
 
     try {
-        const response = await postJson(ENDPOINT_VALVE, { opening });
+        const response = await postJson(ENDPOINT_POT, {
+            pot: {
+                val: opening,
+                who: WHO
+            }
+        });
         if (!response.ok) throw new Error("Failed to set valve");
 
         showToast("Valve Updated", `Valve opening set to ${opening}%`, 'success');
@@ -378,7 +372,7 @@ valveSlider.addEventListener("input", (event) => {
 });
 
 switchModeBtn.addEventListener("click", switchMode);
-sendValveBtn.addEventListener("click", sendValve);
+sendValveBtn.addEventListener("click", sendPot);
 toggleRefreshBtn.addEventListener("click", toggleAutoRefresh);
 
 /* ===== INITIALIZATION ===== */

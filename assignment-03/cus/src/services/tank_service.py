@@ -15,7 +15,7 @@ from core.system_states import *
 logger = get_logger(__name__)
 
 
-class TankController(BaseService):
+class TankService(BaseService):
     """
     Minimal FSM Controller (State Pattern).
     
@@ -37,10 +37,8 @@ class TankController(BaseService):
         # Track last value from each source (who) for pot
         self._last_pot_msg: dict[str, float] = {}  # {source_id: last_value}
         # Water level history
-        self._water_levels: Deque[LevelReading] = deque(maxlen=20)
-        
-        # NOTE: Topic subscriptions are done in main.py, not here
-        
+        self._water_levels: Deque[LevelReading] = deque(maxlen=config.MAX_READINGS)
+
         logger.info(f"[{self.name}] FSM initialized: {self._current_state.get_state_name()}")
 
     async def run(self):
@@ -48,13 +46,10 @@ class TankController(BaseService):
         Event-driven FSM: reacts to events via pubsub callbacks.
         Periodic loop only checks for connectivity timeout.
         """
-        #print(f"[{self.name}] 🚀 RUN LOOP STARTED")
         while self._running:
             # Check timeout (convert to milliseconds for config comparison)
             current_time = time.time()
-            #print(f"[{self.name}] ⏱️ Running periodic check at {current_time}, last level timestamp: {self._last_level_timestamp}")
             elapsed_ms = int((current_time - self._last_level_timestamp) * 1000)
-            #print(f"[{self.name}] ⏱️ Elapsed: {elapsed_ms}ms, checking timeout...")
             self._current_state.check_timeout(elapsed_ms, self)
             
             await asyncio.sleep(1.0)
@@ -70,15 +65,14 @@ class TankController(BaseService):
         measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
         self.bus.publish(config.LEVELS_OUT_TOPIC, levels=self._water_levels)
-        #print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
-        
+
         # Delegate to state
         self._current_state.handle_level_event(measure.water_level, measure.timestamp, self)
 
     def _on_button_pressed(self, btn):
         """Delegate button.pressed event to current state."""
         if btn:
-            print(f"[{self.name}] 🔘 Button pressed!")
+            logger.info(f"[{self.name}] 🔘 Button pressed!")
             self._current_state.handle_button_pressed(self)
 
     def _on_manual_valve(self, pot):
@@ -95,9 +89,11 @@ class TankController(BaseService):
         if isinstance(pot, dict) and "val" in pot and "who" in pot:
             value = pot["val"]
             source_id = pot["who"]
-            if source_id in self._last_pot_msg and abs(value - self._last_pot_msg[source_id]) < config.TOLERANCE:
-                return
+            if source_id in self._last_pot_msg and abs(self._last_pot_msg[source_id] - value) < config.TOLERANCE:
+                logger.info(f"[{self.name}] Ignoring duplicate pot value {value} from source '{source_id}'")
+                return  # Ignore duplicate
             self._last_pot_msg[source_id] = value
+            logger.debug(f"[{self.name}] 🎛️ Manual valve command received: {value} from source '{source_id}'")
             self._current_state.handle_manual_valve(value, self)
 
     def transition_to(self, new_state: SystemStateBase):
@@ -120,7 +116,7 @@ class TankController(BaseService):
     
     @property
     def water_levels(self) -> List[LevelReading]:
-        return self._water_levels
+        return list(self._water_levels)
     
     @property
     def current_level(self) -> float:

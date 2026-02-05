@@ -5,7 +5,7 @@ from services.event_bus import EventBus
 from services.serial_service import SerialService
 from services.mqtt_service import MQTTService, QOSLevel
 from services.http_service import HttpService
-from core.tank_controller import TankController
+from src.services.tank_service import TankService
 from core.system_states import AutomaticSystemState
 from config import *
 from utils.logger import get_logger
@@ -18,11 +18,11 @@ async def main():
     bus = EventBus()
 
     # 2. Instantiate the Event-Driven FSM Controller
-    controller = TankController(event_bus=bus)
+    tank_service = TankService(event_bus=bus)
 
-    bus.subscribe(MODE_CHANGE_TOPIC, controller._on_button_pressed)
-    bus.subscribe(POT_TOPIC, controller._on_manual_valve)
-    bus.subscribe(LEVEL_IN_TOPIC, controller._on_level_event)
+    bus.subscribe(MODE_CHANGE_TOPIC, tank_service._on_button_pressed)
+    bus.subscribe(POT_TOPIC, tank_service._on_manual_valve)
+    bus.subscribe(LEVEL_IN_TOPIC, tank_service._on_level_event)
     
     # 3. Instantiate Infrastructure Adapters
     serial_service = SerialService(
@@ -80,14 +80,13 @@ async def main():
     bus.subscribe(OPENING_TOPIC, lambda **kw: http_service.on_state_update("valve", **kw))
     
     # 5. Start all services concurrently
-    services = [controller, serial_service, mqtt_service, http_service]  # TEST: Serial + MQTT
+    services = [tank_service, serial_service, mqtt_service, http_service]  # TEST: Serial + MQTT
     
-    print("=" * 80)
-    print("🚀 Starting all system services...")
-    print(f"Services to start: {[s.name for s in services]}")
-    print("=" * 80)
+    logger.info("=" * 80)
     logger.info("🚀 Starting all system services...")
     logger.info(f"Services to start: {[s.name for s in services]}")
+    logger.info("=" * 80)
+    # start all services concurrently
     await asyncio.gather(*(service.start() for service in services))
 
     # 6. Graceful shutdown handler
@@ -106,4 +105,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
+        logger.debug("KeyboardInterrupt received. Exiting...")
         pass
