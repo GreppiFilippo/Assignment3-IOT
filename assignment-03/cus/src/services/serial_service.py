@@ -128,9 +128,15 @@ class SerialService(BaseService):
             # Pubblica su topic multipli in base ai dati ricevuti
             for serial_key, bus_topic in self._pub_topics.items():
                 if serial_key in data:
-                    # Pubblica solo il valore per quel topic specifico
-                    self.bus.publish(bus_topic, **{serial_key: data[serial_key]})
-                    logger.debug(f"[{self.name}] Published {serial_key} → {bus_topic}")
+                    # Extract value and publish with the FSM-expected parameter name
+                    value = data[serial_key]
+                    if bus_topic == "sensor.level":
+                        # FSM expects: sensor.level(level=X)
+                        self.bus.publish(bus_topic, level=value)
+                    else:
+                        # Generic pass-through for other topics
+                        self.bus.publish(bus_topic, **{serial_key: value})
+                    logger.debug(f"[{self.name}] Published {serial_key} → {bus_topic}: {value}")
                     
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
