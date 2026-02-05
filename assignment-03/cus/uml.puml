@@ -46,7 +46,7 @@ package "Core Domain Layer" {
 }
 
 ' Relations
-MqttAdapter --|> CusEventBus : "publishes mesure = {lvl, timestamp}"
+MqttAdapter --|> CusEventBus : "publishes {mesure = {lvl, timestamp}}"
 SerialAdapter --|> CusEventBus : "publishes {{btn, who}, pot}"
 HttpAdapter --|> CusEventBus : "publishes {{btn, who}, pot}"
 
@@ -58,4 +58,7 @@ SystemState <|-- UnconnectedState
 TankController --|> CusEventBus : "publishes VALVE_CMD / STATE_CHANGE"
 CusEventBus ..> SerialAdapter : "notifies {mode, valve}"
 CusEventBus ..> HttpAdapter : "notifies {mode, valve, lvl}"
+
+CusEventBus ..> TankController : "notifies {mesure, valve, mode, {btn, who}, pot}"
+
 @enduml

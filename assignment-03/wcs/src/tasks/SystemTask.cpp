@@ -20,15 +20,16 @@ void SystemTask::tick() {
     this->lastButtonPressTimestamp = millis();
   }
 
-  // Set btn nested object: { val: true|false, who: "wcs" }
   unsigned long lastMsgSent = this->pContext->getLastMsgSentTimestamp();
-  JsonObject btnObj = this->pContext->getOrCreateNestedObject(BUTTON_PRESSED_JSON);
-  btnObj["val"] = this->lastButtonPressTimestamp > lastMsgSent;
-  btnObj["who"] = "wcs";
+  this->pContext->setField(BUTTON_PRESSED_JSON,
+                           this->lastButtonPressTimestamp > lastMsgSent);
 
+  JsonObject btnObj =
+      this->pContext->getOrCreateNestedObject(POTENTIOMETER_JSON);
   this->pPot->sync();
   float potValue = this->pPot->getValue();
-  this->pContext->setField(POTENTIOMETER_JSON, static_cast<int>(potValue));
+  btnObj["val"] = static_cast<int>(potValue);
+  btnObj["who"] = "wcs";
 
   switch (this->state) {
     case UNCONNECTED: {
