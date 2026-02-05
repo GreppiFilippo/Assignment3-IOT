@@ -95,9 +95,11 @@ class TankController(BaseService):
         if isinstance(pot, dict) and "val" in pot and "who" in pot:
             value = pot["val"]
             source_id = pot["who"]
-            if source_id in self._last_pot_msg and abs(value - self._last_pot_msg[source_id]) < config.TOLERANCE:
-                return
+            if source_id in self._last_pot_msg and abs(self._last_pot_msg[source_id] - value) < config.TOLERANCE:
+                logger.info(f"[{self.name}] Ignoring duplicate pot value {value} from source '{source_id}'")
+                return  # Ignore duplicate
             self._last_pot_msg[source_id] = value
+            print(f"[{self.name}] 🎛️ Manual valve command received: {value} from source '{source_id}'")
             self._current_state.handle_manual_valve(value, self)
 
     def transition_to(self, new_state: SystemStateBase):

@@ -116,6 +116,19 @@ class HttpService(BaseService):
             
             return {"status": "error", "message": "Missing pot value"}, 400
         
+        @self._app.post("/api/v1/change")
+        async def set_btn(payload: dict):
+            """
+            Riceve un JSON tipo: {"btn": true}
+            E lo pubblica sull'Event Bus.
+            """
+            btn = payload.get("btn", False)
+            
+            if btn:
+                self.bus.publish(config.MODE_CHANGE_TOPIC, btn=btn)
+                return {"status": "success", "sent": btn}
+            
+            return {"status": "error", "message": "Button not pressed"}, 400
         
     
     def configure_periodic_publishing(self, topic: str, data_generator: Callable):
