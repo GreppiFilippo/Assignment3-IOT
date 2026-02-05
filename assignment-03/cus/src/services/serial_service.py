@@ -110,9 +110,6 @@ class SerialService(BaseService):
                     logger.debug(f"Published to {key}: {actual_param_name}={value}")
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
-                      
-        except json.JSONDecodeError:
-            logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 
     async def _write_serial_data(self, data: dict):
         """Send the current state as JSON to the hardware."""
