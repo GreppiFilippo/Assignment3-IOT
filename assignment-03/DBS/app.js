@@ -179,7 +179,7 @@ const chart = new Chart(ctx, {
  */
 async function fetchLatest() {
     try {
-        const response = await fetch(`${ENDPOINT_READINGS}?limit=${MAX_READINGS}`);
+        const response = await fetch(`${ENDPOINT_READINGS}`);
         if (!response.ok) throw new Error(response.status);
 
         const data = await response.json();
@@ -187,27 +187,32 @@ async function fetchLatest() {
         labels.length = 0;
         values.length = 0;
 
-        data.forEach(reading => {
-            labels.push(new Date(reading.ts));
-            values.push(reading.value);
+        data["levels"].forEach(reading => {
+            labels.push(new Date(reading.timestamp));
+            values.push(reading.water_level);
         });
 
         chart.update();
 
-        const statusResponse = await fetch(ENDPOINT_STATUS);
-        const status = await statusResponse.json();
+        const modeResponse = await fetch(ENDPOINT_MODE);
+        const modeData = await modeResponse.json();
+        const currentState = modeData.mode ?? State.NOT_AVAILABLE;
 
-        systemState.textContent = status.state ?? State.NOT_AVAILABLE;
-        valveOpening.textContent = `${status.valve_opening ?? "--"}`;
+        const valveResponse = await fetch(ENDPOINT_VALVE);
+        const valveData = await valveResponse.json();
+        const currentValve = valveData.valve;
+
+        systemState.textContent = currentState;
+        valveOpening.textContent = currentValve !== undefined ? `${currentValve}%` : "--";
 
         // Sync slider with current valve opening ONLY if user is not interacting
-        if (!userInteractingWithSlider && status.valve_opening !== null && status.valve_opening !== undefined) {
-            valveSlider.value = status.valve_opening;
-            sliderValue.textContent = `${status.valve_opening}%`;
+        if (!userInteractingWithSlider && currentValve !== null && currentValve !== undefined) {
+            valveSlider.value = currentValve;
+            sliderValue.textContent = `${currentValve}`;
         }
 
-        updateSystemStateBadge(status.state);
-        updateManualControls(status.state);
+        updateSystemStateBadge(currentState);
+        updateManualControls(currentState);
         updateLastUpdateTimestamp();
 
     } catch (error) {
