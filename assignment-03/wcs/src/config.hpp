@@ -32,8 +32,17 @@
 
 #define TIMEOUT_UNCONNECTED 5000  // ms
 
-#define ALIVE "alive"
+#define ALIVE_JSON "alive"
+#define BUTTON_PRESSED_JSON "btn"
+#define POTENTIOMETER_JSON "pot"
+
+#define MODE_COMMAND_JSON "mode"
+#define VALVE_COMMAND_JSON "valve"
+#define MODE_UNCONNECTED "UNCONNECTED"
+#define MODE_AUTOMATIC "AUTOMATIC"
+#define MODE_MANUAL "MANUAL"
 
 #define STORAGE_JSON_SIZE 48
 #define OUTPUT_JSON_SIZE 48
+#define INPUT_JSON_SIZE 64
 #endif  // __CONFIG__
