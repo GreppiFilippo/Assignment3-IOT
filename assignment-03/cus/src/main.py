@@ -18,11 +18,11 @@ async def main():
 
     # 2. Instantiate the Event-Driven FSM Controller
     controller = TankController(event_bus=bus)
-    
-    logger.info("✅ TankController FSM initialized")
-    logger.info("   Subscribes to: sensor.level, button.pressed, manual.valve_command")
-    logger.info("   Publishes to: cmd.valve, mode")
 
+    bus.subscribe(MODE_CHANGE_TOPIC, controller._on_button_pressed)
+    bus.subscribe(POT_TOPIC, controller._on_manual_valve)
+    bus.subscribe(LEVEL_IN_TOPIC, controller._on_level_event)
+    
     # 3. Instantiate Infrastructure Adapters
     serial_service = SerialService(
         port=SERIAL_PORT, 
@@ -30,6 +30,9 @@ async def main():
         event_bus=bus,
         send_interval=SERIAL_SEND_INTERVAL
     )
+
+    bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
+    bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
     
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,
@@ -42,36 +45,17 @@ async def main():
         event_bus=bus,
         host=HTTP_HOST,
         port=HTTP_PORT,
-        publish_interval=10.0
+        publish_interval=10.0,
+        api_prefix="/api/v1"
     )
 
-    # 4. Wiring: Configure Pub/Sub Topics
-    
-    # Serial: Reads POT_VAL from Arduino -> Publishes to "sensor.level"
-    #         Listens to "cmd.valve" from FSM
-    serial_service.configure_messaging(
-        pub_topics={"POT_VAL": "sensor.level"},
-        sub_topics={"cmd.valve": "VALVE"}
-    )
-
-    # MQTT: Publishes "sensor.level" to cloud
-    #       Listens to cloud commands -> routes to "cmd.valve"
-    mqtt_service.configure_messaging(
-        incoming={"remote/control": "cmd.valve"},
-        outgoing={"sensor.level": "cloud/level"}
-    )
-    
-    # HTTP: Watch topics for API state + expose endpoints
-    http_service.configure_messaging(
-        watched_topics=["sensor.level", "cmd.valve", "mode"]
-    )
     
     # Map topics to REST endpoints
-    http_service.map_topic_to_endpoint("manual.valve_command", "POST")
-    http_service.map_topic_to_endpoint("button.pressed", "POST")
+    http_service.map_topic_to_endpoint(OPENING_TOPIC, "POST")
+    http_service.map_topic_to_endpoint(MODE_CHANGE_TOPIC, "POST")
     
     # Add status endpoint
-    @http_service._app.get("/status")
+    @http_service._app.get("/api/v1/status")
     async def get_status():
         """Get current system status."""
         state = controller.state

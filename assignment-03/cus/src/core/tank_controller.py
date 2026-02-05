@@ -55,25 +55,25 @@ class TankController(BaseService):
             
             await asyncio.sleep(1.0)
 
-    def _on_level_event(self, level, timestamp):
+    def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
         # Store in history
-        reading = LevelReading(water_level=level, timestamp=timestamp)
-        self._water_levels.append(reading)
+        measure = LevelReading(reading["level"], reading["timestamp"])
+        self._water_levels.append(measure)
         
         # Update timestamp
-        self._last_level_timestamp = int(time.monotonic() * 1000)
+        self._last_level_timestamp = measure.timestamp
         
         # Delegate to state
-        self._current_state.handle_level_event(level, timestamp, self)
+        self._current_state.handle_level_event(measure.level, measure.timestamp, self)
 
-    def _on_button_pressed(self, **kwargs):
+    def _on_button_pressed(self):
         """Delegate button.pressed event to current state."""
         self._current_state.handle_button_pressed(self)
 
-    def _on_manual_valve(self, **kwargs):
+    def _on_manual_valve(self, value: float):
         """Delegate manual.valve_command event to current state."""
-        opening = kwargs.get("opening", 0.0)
+        opening = value
         self._current_state.handle_manual_valve(opening, self)
 
     def transition_to(self, new_state: SystemStateBase):

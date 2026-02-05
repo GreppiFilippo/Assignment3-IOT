@@ -30,7 +30,7 @@ class HttpService(BaseService):
     """
 
     def __init__(self, event_bus: EventBus, host: str = "0.0.0.0", port: int = 8000, 
-                 publish_interval: float = 10.0):
+                 publish_interval: float = 10.0, api_prefix: str = ""):
         """
         Initialize the HTTP service.
         
@@ -38,12 +38,14 @@ class HttpService(BaseService):
         :param host: Server host address.
         :param port: Server port.
         :param publish_interval: Interval in seconds for periodic publishing.
+        :param api_prefix: API prefix (e.g., "/api/v1")
         """
         super().__init__("http_service", event_bus)
         self.host = host
         self.port = port
         self._publish_interval = publish_interval
         self._last_publish_time = 0.0
+        self._api_prefix = api_prefix.rstrip('/')  # Remove trailing slash
         
         # Internal state to hold the latest data from the Bus
         self._state: Dict[str, Any] = {}
@@ -118,9 +120,9 @@ class HttpService(BaseService):
         
         Esempio:
             map_topic_to_endpoint("cmd.valve", "POST")
-            → Crea POST /cmd/valve che pubblica su "cmd.valve"
+            → Crea POST /api/v1/cmd/valve che pubblica su "cmd.valve"
         """
-        path = f"/{topic.replace('.', '/')}"
+        path = f"{self._api_prefix}/{topic.replace('.', '/')}"
         
         if method.upper() == "POST":
             @self._app.post(path)

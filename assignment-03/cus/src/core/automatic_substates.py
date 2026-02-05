@@ -41,7 +41,7 @@ class AutomaticSubStateBase(ABC):
     def on_enter(self, controller: 'TankController'):
         """Called when entering this substate."""
         opening = self.get_valve_opening()
-        controller.bus.publish("cmd.valve", opening=opening)
+        controller.bus.publish(config.OPENING_TOPIC, opening=opening)
         logger.info(f"Entered {self.get_state_name().value} - valve: {opening}%")
 
 

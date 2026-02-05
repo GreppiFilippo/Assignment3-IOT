@@ -28,41 +28,13 @@ class SerialService(BaseService):
         self._last_state_received: dict = {}
         self._last_send_time = 0.0
         
-        # Messaging configuration (set via configure_messaging)
-        # Mapping: { "serial_key": "bus_topic" } per publishing multiplo
-        self._pub_topics: Dict[str, str] = {}
-        # Mapping: { "bus_topic": callback } per subscription personalizzate
-        self._sub_handlers: Dict[str, Callable] = {}
-
-    def configure_messaging(self, pub_topics: Optional[Dict[str, str]] = None, sub_topics: Optional[Dict[str, str]] = None):
-        """
-        Configure multi-topic pub/sub wiring.
+        # Mapping from serial keys to event bus topics
+        self._pub_topics: Dict[str, str] = {
+            "level": "level_in",
+            "pot": "pot",
+            "btn": "btn"
+        }
         
-        :param pub_topics: Dict mapping serial data keys to bus topics
-                          Example: {"POT_VAL": "sensor.level", "TEMP": "sensor.temperature"}
-        :param sub_topics: Dict mapping bus topics to serial command keys
-                          Example: {"cmd.valve": "VALVE", "cmd.alarm": "ALARM"}
-        """
-        if pub_topics:
-            self._pub_topics = pub_topics
-            logger.info(f"[{self.name}] Will publish: {pub_topics}")
-        
-        if sub_topics:
-            for bus_topic, serial_key in sub_topics.items():
-                # Crea callback specifica per ogni topic
-                callback = self._make_subscription_handler(serial_key)
-                self.bus.subscribe(bus_topic, callback)
-                self._sub_handlers[bus_topic] = callback
-                logger.info(f"[{self.name}] Subscribed to: {bus_topic} → Serial key: {serial_key}")
-
-    def _make_subscription_handler(self, serial_key: str):
-        """Factory per creare callback specifiche per ogni topic."""
-        def handler(**kwargs):
-            # Salva i dati con la chiave serial corretta
-            self._last_state_received[serial_key] = kwargs
-            logger.debug(f"[{self.name}] Received on bus → {serial_key}: {kwargs}")
-        return handler
-
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
         try:
@@ -125,17 +97,31 @@ class SerialService(BaseService):
         try:
             data = json.loads(line)
             
-            # Pubblica su topic multipli in base ai dati ricevuti
+            # Publish based on received data
             for serial_key, bus_topic in self._pub_topics.items():
                 if serial_key in data:
-                    # Extract value and publish with the FSM-expected parameter name
                     value = data[serial_key]
-                    if bus_topic == "sensor.level":
-                        # FSM expects: sensor.level(level=X)
-                        self.bus.publish(bus_topic, level=value)
+                    
+                    if bus_topic == "level_in":
+                        # Controller expects: _on_level_event(reading: dict)
+                        # reading should have "level" and "timestamp"
+                        import time
+                        reading = {
+                            "level": value,
+                            "timestamp": time.time()
+                        }
+                        self.bus.publish(bus_topic, reading=reading)
+                    elif bus_topic == "pot":
+                        # Controller expects: _on_manual_valve(value: float)
+                        self.bus.publish(bus_topic, value=value)
+                    elif bus_topic == "btn":
+                        # Controller expects: _on_button_pressed() - no parameters
+                        if value:  # Only trigger on button press (value=1 or True)
+                            self.bus.publish(bus_topic)
                     else:
-                        # Generic pass-through for other topics
+                        # Generic fallback
                         self.bus.publish(bus_topic, **{serial_key: value})
+                        
                     logger.debug(f"[{self.name}] Published {serial_key} → {bus_topic}: {value}")
                     
         except json.JSONDecodeError:
@@ -159,3 +145,12 @@ class SerialService(BaseService):
         if self._serial:
             self._serial.close()
             logger.info(f"[{self.name}] Serial port closed.")
+
+        
+    def on_mode_change(self, mode: str):
+        """Update internal state based on mode changes from the Event Bus."""
+        self._last_state_received['mode'] = mode
+
+    def on_valve_command(self, opening: float):
+        """Update internal state based on valve commands from the Event Bus."""
+        self._last_state_received['valve_opening'] = opening
