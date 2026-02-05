@@ -34,4 +34,6 @@
 
 #define ALIVE "alive"
 
+#define STORAGE_JSON_SIZE 48
+#define OUTPUT_JSON_SIZE 48
 #endif  // __CONFIG__
