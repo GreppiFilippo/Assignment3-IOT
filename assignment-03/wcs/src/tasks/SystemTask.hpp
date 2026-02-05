@@ -23,6 +23,7 @@ class SystemTask : public Task {
   enum State { UNCONNECTED, CONNECTED } state;
   bool justEntered;
   unsigned long stateTimestamp;
+  unsigned long lastButtonPressTimestamp;
 
  public:
   SystemTask(Context* context, Button* btn, Potentiometer* pot);
