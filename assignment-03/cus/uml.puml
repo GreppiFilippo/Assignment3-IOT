@@ -1,0 +1,62 @@
+@startuml cus
+skinparam componentStyle uml2
+
+package "Infrastructure Layer (Adapters)" {
+    class MqttAdapter {
+        - client: MqttClient
+        + onMessageReceived(topic, payload)
+        + updateLeds(status)
+    }
+
+    class SerialAdapter {
+        - serialPort: Serial
+        + readLoop()
+        + sendCommand(cmd)
+    }
+
+    class HttpAdapter {
+        - apiServer: FastAPI/Flask
+        + getStatus()
+        + postModeChange()
+    }
+}
+
+package "Core Domain Layer" {
+    class CusEventBus {
+        - subscribers: Map<EventType, List<Callback>>
+        + publish(Event)
+        + subscribe(EventType, Callback)
+    }
+
+    class TankController <<(S, #FF7700) Singleton>> {
+        - currentState: SystemState
+        - waterLevelHistory: List<Float>
+        + handleEvent(Event)
+        - updateLogic()
+    }
+
+    interface SystemState {
+        + handleLevel(level)
+        + handleManualCommand()
+    }
+
+    class AutomaticState
+    class ManualState
+    class UnconnectedState
+}
+
+' Relations
+MqttAdapter --|> CusEventBus : "publishes mesure = {lvl, timestamp}"
+SerialAdapter --|> CusEventBus : "publishes {{btn, who}, pot}"
+HttpAdapter --|> CusEventBus : "publishes {{btn, who}, pot}"
+
+TankController *-right- SystemState
+SystemState <|-- AutomaticState
+SystemState <|-- ManualState
+SystemState <|-- UnconnectedState
+
+TankController --|> CusEventBus : "publishes VALVE_CMD / STATE_CHANGE"
+CusEventBus ..> SerialAdapter : "notifies {mode, valve}"
+CusEventBus ..> HttpAdapter : "notifies {mode, valve, lvl}"
+CusEventBus ..> MqttAdapter : "notifies"
+@enduml

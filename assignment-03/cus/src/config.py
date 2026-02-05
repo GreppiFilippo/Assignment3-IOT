@@ -10,6 +10,8 @@ MODE= "mode"
 MODE_CHANGE = "mode_change"
 OPENING = "opening"
 
+SERIAL_SEND_INTERVAL=0.5  # Time interval to send data to Arduino (in seconds)
+
 
 # === Serial Configuration ===
 SERIAL_PORT = "COM3"  # Change to "/dev/ttyUSB0" on Linux/Mac

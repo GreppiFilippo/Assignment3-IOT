@@ -2,7 +2,7 @@ import asyncio
 import json
 import serial
 import time
-from typing import Optional, List
+from typing import Optional, Dict, Callable, Any
 
 from services.event_bus import EventBus
 from .base_service import BaseService
@@ -29,24 +29,39 @@ class SerialService(BaseService):
         self._last_send_time = 0.0
         
         # Messaging configuration (set via configure_messaging)
-        self._pub_topic: Optional[str] = None
+        # Mapping: { "serial_key": "bus_topic" } per publishing multiplo
+        self._pub_topics: Dict[str, str] = {}
+        # Mapping: { "bus_topic": callback } per subscription personalizzate
+        self._sub_handlers: Dict[str, Callable] = {}
 
-    def configure_messaging(self, pub_topic: str, sub_topics: List[str]):
+    def configure_messaging(self, pub_topics: Optional[Dict[str, str]] = None, sub_topics: Optional[Dict[str, str]] = None):
         """
-        Configure the pub/sub wiring from the main entry point.
+        Configure multi-topic pub/sub wiring.
         
-        :param pub_topic: The topic where serial data will be published.
-        :param sub_topics: List of topics this service should listen to.
+        :param pub_topics: Dict mapping serial data keys to bus topics
+                          Example: {"POT_VAL": "sensor.level", "TEMP": "sensor.temperature"}
+        :param sub_topics: Dict mapping bus topics to serial command keys
+                          Example: {"cmd.valve": "VALVE", "cmd.alarm": "ALARM"}
         """
-        self._pub_topic = pub_topic
-        for topic in sub_topics:
-            self.bus.subscribe(topic, self._on_bus_message)
-            logger.info(f"[{self.name}] Subscribed to topic: {topic}")
+        if pub_topics:
+            self._pub_topics = pub_topics
+            logger.info(f"[{self.name}] Will publish: {pub_topics}")
+        
+        if sub_topics:
+            for bus_topic, serial_key in sub_topics.items():
+                # Crea callback specifica per ogni topic
+                callback = self._make_subscription_handler(serial_key)
+                self.bus.subscribe(bus_topic, callback)
+                self._sub_handlers[bus_topic] = callback
+                logger.info(f"[{self.name}] Subscribed to: {bus_topic} → Serial key: {serial_key}")
 
-    def _on_bus_message(self, **kwargs):
-        """Callback for incoming messages from the Event Bus."""
-        # Update the local state to be sent to hardware on next tick
-        self._last_state_received.update(kwargs)
+    def _make_subscription_handler(self, serial_key: str):
+        """Factory per creare callback specifiche per ogni topic."""
+        def handler(**kwargs):
+            # Salva i dati con la chiave serial corretta
+            self._last_state_received[serial_key] = kwargs
+            logger.debug(f"[{self.name}] Received on bus → {serial_key}: {kwargs}")
+        return handler
 
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
@@ -106,11 +121,17 @@ class SerialService(BaseService):
 
     async def _process_incoming_line(self, line: str):
         """Parse JSON from hardware and publish to the Event Bus."""
-        if not line or not self._pub_topic: return
+        if not line or not self._pub_topics: return
         try:
             data = json.loads(line)
-            # Publish using the topic injected from main
-            self.bus.publish(self._pub_topic, **data)
+            
+            # Pubblica su topic multipli in base ai dati ricevuti
+            for serial_key, bus_topic in self._pub_topics.items():
+                if serial_key in data:
+                    # Pubblica solo il valore per quel topic specifico
+                    self.bus.publish(bus_topic, **{serial_key: data[serial_key]})
+                    logger.debug(f"[{self.name}] Published {serial_key} → {bus_topic}")
+                    
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 

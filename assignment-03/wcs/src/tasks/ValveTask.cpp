@@ -18,6 +18,7 @@ void ValveTask::tick() {
 
       if (this->checkAndSetJustEntered()) {
         Logger.log(F("[VT] IDLE"));
+        this->pServo->off();
       }
 
       if (this->pContext->getReceivedValvePosition() != this->currentPosition) {
@@ -34,6 +35,7 @@ void ValveTask::tick() {
     case MOVING:
       if (this->checkAndSetJustEntered()) {
         Logger.log(F("[VT] MOVING"));
+        this->pServo->on();
       }
 
       if (this->elapsedTimeInState() >= this->moveDuration) {
