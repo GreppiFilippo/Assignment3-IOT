@@ -30,14 +30,9 @@ bool ButtonImpl::isPressed() {
 }
 
 bool ButtonImpl::wasPressed() {
+  bool prevState = currentState;
   isPressed();  // Update state
 
   // Rising edge: previous was LOW, current is HIGH
-  bool risingEdge = !previousStableState && currentState;
-
-  if (risingEdge) {
-    previousStableState = currentState;
-  }
-
-  return risingEdge;
+  return !prevState && currentState;
 }
