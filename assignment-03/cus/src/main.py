@@ -1,81 +1,75 @@
-from models.system_model import SystemModel
-from utils.logger import setup_logging, get_logger
 import asyncio
-from controllers.system_controller import SystemController
-from services.mqtt_service import MQTTService
-from services.serial_service import SerialService
-from services.http_service import HttpService
-import config
+import signal
 from services.event_bus import EventBus
-from controllers.orchestrator import Orchestrator
+from services.serial_service import SerialService
+from services.mqtt_service import MQTTService
+from core.tank_controller import TankController
+from config import *
 
-# Setup logging
-setup_logging(log_level=config.LOG_LEVEL, log_file=config.LOG_FILE)
-logger = get_logger(__name__)
-
-status = 0
 async def main():
-    logger.info("Initializing CUS application with PyPubSub EventBus")
-    event_bus = EventBus()
-    model = SystemModel()
+    # 1. Initialize the Single Instance of the Event Bus
+    bus = EventBus()
 
-    
-    # Create services (no event_dispatcher needed - using EventBus)
-    mqtt_service = MQTTService(
-        broker=config.MQTT_BROKER_HOST,
-        port=config.MQTT_BROKER_PORT
-    )
+    # 2. Instantiate the Core Controller (Domain Layer)
+    # The controller logic is now decoupled from hardware
+    controller = TankController(event_bus=bus)
 
+    # 3. Instantiate Infrastructure Adapters
     serial_service = SerialService(
-        port=config.SERIAL_PORT,
-        baudrate=config.SERIAL_BAUDRATE
+        port="/dev/ttyUSB0", 
+        baudrate=9600, 
+        event_bus=bus,
+        send_interval=0.5
     )
-
-    http_service = HttpService(
-        host=config.HTTP_HOST,
-        port=config.HTTP_PORT
-    )
-
-    orchestrator = Orchestrator(
-        event_bus=event_bus
-    )
-
-    event_bus.subscribe(config.LEVEL_OUT_TOPIC, setstatus)
-    event_bus.subscribe(config.REQUESTED_OPENING, orchestrator.handle_req_opening)
-    event_bus.subscribe(config.MODE_CHANGE, orchestrator.handle_mode_change)
-    event_bus.subscribe(config.LEVEL_IN_TOPIC, orchestrator.handle_new_measurement)
-
-    event_bus.subscribe(config.MODE, serial_service.store_new_mode)
-    event_bus.subscribe(config.OPENING, serial_service.store_new_opening)
     
-
-    # Create controller (transport-agnostic)
-    services = [mqtt_service, serial_service, http_service]
-    
-    controller = SystemController(
-        model=model,
-        services=services
+    # Let's assume you have an MqttService similar to SerialService
+    mqtt_service = MQTTService(
+        broker=MQTT_BROKER_HOST,
+        port=MQTT_BROKER_PORT,
+        event_bus=bus,
+        qos=1
     )
+
+    # 4. Wiring: Configure Pub/Sub Topics for each service
+    # This is the "Registry" where you define the communication flow
+    
+    # Serial: Reads POT_VAL from Arduino -> Publishes to "sensor.level"
+    #         Listens to "cmd.valve" to send to Arduino
+    serial_service.configure_messaging(
+        pub_topic="sensor.level",
+        sub_topics=["cmd.valve"]
+    )
+
+    # MQTT: Publishes internal "sensor.level" to the cloud
+    #       Listens to cloud "remote/control" -> Publishes to "cmd.valve"
+    mqtt_service.configure_messaging(
+        pub_topic="cmd.valve",
+        sub_topics=["sensor.level"]
+    )
+
+    # 5. Start all services concurrently
+    # asyncio.gather runs them as concurrent tasks in the same event loop
+    services = [serial_service, mqtt_service]
+    
+    logger.info("Starting all system services...")
+    await asyncio.gather(*(service.start() for service in services))
+
+    # 6. Keep the main alive and handle graceful shutdown
+    stop_event = asyncio.Event()
+    
+    # Handle CTRL+C
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop_event.set)
 
     try:
-        await controller.run()
-    except asyncio.CancelledError:
-        logger.info("Application cancelled, shutting down...")
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received, shutting down...")
+        await stop_event.wait()
     finally:
-        # Ensure clean shutdown of all services
-        await controller.stop()
+        logger.info("Shutting down services...")
+        await asyncio.gather(*(service.stop() for service in services), return_exceptions=True)
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Shutdown requested")
-
-def getStatus():
-    return status
-
-def setstatus(s):
-    global status
-    status = s
+        pass

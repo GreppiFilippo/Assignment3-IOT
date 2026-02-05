@@ -1,133 +1,132 @@
 import asyncio
-from .base_service import BaseService
-import paho.mqtt.client as mqtt
-from utils.logger import get_logger
-from .event_bus import EventBus
 import json
+import paho.mqtt.client as mqtt
+from typing import List, Dict, Optional
+from services.event_bus import EventBus
+from .base_service import BaseService
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 class MQTTService(BaseService):
     """
-    MQTT service for receiving messages from MQTT broker.
-    Publishes received messages to EventBus for decoupled communication.
+    MQTT Infrastructure Adapter.
+    Acts as a bridge between an external MQTT Broker and the internal EventBus.
     """
 
-    def __init__(
-        self, 
-        broker: str, 
-        port: int, 
-        topics: str | list[str],
-        qos: int = 0
-    ):
+    def __init__(self, broker: str, port: int, event_bus: EventBus, qos: int = 0):
         """
-        Initialize MQTT service.
+        Initialize the MQTT service.
         
-        :param broker: MQTT broker address
-        :type broker: str
-        :param port: MQTT broker port
-        :type port: int
-        :param topics: MQTT topics to subscribe to
-        :type topics: str | list[str]
-        :param qos: Quality of Service level (0: at most once, 1: at least once, 2: exactly once)
-        :type qos: int
+        :param broker: MQTT broker address.
+        :param port: MQTT broker port.
+        :param event_bus: Injected instance of EventBus.
+        :param qos: Quality of Service level.
         """
-        super().__init__("mqtt_service", None)  # No event_dispatcher needed
+        super().__init__("mqtt_service", event_bus)
         self.broker = broker
         self.port = port
-        self.topics = [topics] if isinstance(topics, str) else topics
-        self.qos = max(0, min(2, qos))  # Clamp between 0 and 2
+        self.qos = qos
+        
+        # Paho Client setup
         self._client = mqtt.Client()
-        self._loop = None
-        self._connected = False  # Track connection status
+        self._connected = False
+        
+        # Topic Mapping: { "mqtt/topic": "bus.topic" }
+        self._incoming_map: Dict[str, str] = {}
+        # Internal topics to listen to for publishing to MQTT: { "bus.topic": "mqtt/topic" }
+        self._outgoing_map: Dict[str, str] = {}
 
-        self._client.on_connect = self.__on_connect
-        self._client.on_message = self.__on_message
-        self._client.on_disconnect = self.__on_disconnect
+        # Configure Callbacks
+        self._client.on_connect = self._on_mqtt_connect
+        self._client.on_message = self._on_mqtt_message
+        self._client.on_disconnect = self._on_mqtt_disconnect
+
+    def configure_messaging(self, incoming: Dict[str, str], outgoing: Dict[str, str]):
+        """
+        Wire MQTT topics to internal Event Bus topics.
+        
+        :param incoming: Map of { "mqtt/topic": "internal.bus.topic" }
+        :param outgoing: Map of { "internal.bus.topic": "external/mqtt/topic" }
+        """
+        self._incoming_map = incoming
+        self._outgoing_map = outgoing
+        
+        # Subscribe to internal bus topics to forward them to MQTT
+        for bus_topic in self._outgoing_map.keys():
+            self.bus.subscribe(bus_topic, self._on_internal_bus_update)
+            logger.info(f"[{self.name}] Listening to Bus topic: {bus_topic}")
+
+    async def setup(self):
+        """Establish connection with the MQTT broker."""
+        try:
+            # Connect using the thread executor to prevent blocking the event loop
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, lambda: self._client.connect(self.broker, self.port, keepalive=60))
+            
+            # Start the background threaded loop provided by paho-mqtt
+            self._client.loop_start()
+            logger.info(f"[{self.name}] Connecting to broker {self.broker}:{self.port}...")
+        except Exception as e:
+            logger.error(f"[{self.name}] Failed to connect to MQTT broker: {e}")
 
     async def run(self):
-        """Run MQTT service with auto-reconnect"""
-        self._loop = asyncio.get_running_loop()
-        
-        logger.info(f"{self.name} connecting to broker {self.broker}:{self.port}")
-        
-        loop_started = False
-        retry_interval = 5  # seconds between reconnection attempts
-        
-        try:
-            self._client.connect(self.broker, self.port, keepalive=60)
-            self._client.loop_start()
-            loop_started = True
-        except Exception as e:
-            logger.error(f"{self.name} failed to connect to broker: {e}")
-            logger.info(f"{self.name} will retry connection every {retry_interval}s")
+        """Monitor connection status and maintain the service alive."""
+        while self._running:
+            if not self._connected:
+                # Connection logic is handled by paho's loop_start auto-reconnect,
+                # but we can add custom health checks here.
+                await asyncio.sleep(5)
+            await asyncio.sleep(1)
 
-        try:
-            while self._running:
-                # Try to reconnect if not connected
-                if not self._connected and not loop_started:
-                    try:
-                        logger.info(f"{self.name} attempting to reconnect...")
-                        self._client.connect(self.broker, self.port, keepalive=60)
-                        self._client.loop_start()
-                        loop_started = True
-                    except Exception as e:
-                        logger.debug(f"{self.name} reconnect failed: {e}")
-                        # Sleep in small intervals to allow quick shutdown
-                        for _ in range(retry_interval * 10):
-                            if not self._running:
-                                break
-                            await asyncio.sleep(0.1)
-                        continue
-                
-                await asyncio.sleep(0.1)
-        finally:
-            if loop_started:
-                logger.info(f"{self.name} stopping MQTT loop")
-                self._client.loop_stop()
-                self._client.disconnect()
-
-    def __on_connect(self, client, userdata, flags, rc):
-        """Callback invoked when connection to MQTT broker is established."""
+    def _on_mqtt_connect(self, client, userdata, flags, rc):
+        """Callback invoked when connected to the broker."""
         if rc == 0:
             self._connected = True
-            logger.info(f"{self.name} connected to broker")
-            for topic in self.topics:
-                client.subscribe(topic, qos=self.qos)
-                logger.info(f"{self.name} subscribed to topic: {topic} (QoS {self.qos})")
+            logger.info(f"[{self.name}] Successfully connected to MQTT broker.")
+            # Subscribe to all mapped external topics
+            for mqtt_topic in self._incoming_map.keys():
+                client.subscribe(mqtt_topic, qos=self.qos)
+                logger.info(f"[{self.name}] Subscribed to MQTT: {mqtt_topic}")
         else:
-            self._connected = False
-            logger.error(f"{self.name} failed to connect, rc={rc}")
+            logger.error(f"[{self.name}] Connection failed with result code {rc}")
 
-    def __on_disconnect(self, client, userdata, rc):
-        """Callback invoked when disconnected from MQTT broker."""
+    def _on_mqtt_disconnect(self, client, userdata, rc):
+        """Callback invoked when disconnected."""
         self._connected = False
-        if rc == 0:
-            logger.info(f"{self.name} disconnected cleanly")
-        else:
-            logger.warning(f"{self.name} disconnected unexpectedly (rc={rc}), will attempt reconnect")
+        logger.warning(f"[{self.name}] Disconnected from broker (rc: {rc}).")
 
-    def __on_message(self, client, userdata, msg):
-        """Callback invoked when message is received from MQTT broker."""
-        if self._loop is None:
-            logger.warning(f"{self.name} received message before event loop initialized")
-            return
-            
+    def _on_mqtt_message(self, client, userdata, msg):
+        """Handle incoming MQTT messages and publish them to the internal Event Bus."""
         try:
-            payload = msg.payload.decode("utf-8")
-            logger.debug(f"{self.name} received MQTT message: {payload}")
-            data = json.loads(payload)
-
-            for topic, event_data in data.items():
-                if not isinstance(event_data, dict):
-                    logger.warning(f"Skipping topic {topic}: payload not dict")
-                    continue
-
-                asyncio.run_coroutine_threadsafe(
-                    logger.debug("Pubblico su" + topic + " i dati " + str(event_data)),
-                    EventBus.publish(topic, **event_data),
-                    self._loop
-                )
-
+            mqtt_topic = msg.topic
+            bus_topic = self._incoming_map.get(mqtt_topic)
+            
+            if bus_topic:
+                payload = json.loads(msg.payload.decode("utf-8"))
+                logger.debug(f"[{self.name}] MQTT -> Bus: {mqtt_topic} to {bus_topic}")
+                # Use the injected bus to notify the rest of the system
+                self.bus.publish(bus_topic, **payload)
         except Exception as e:
-            logger.exception(f"{self.name} failed to process MQTT message: {e}")
+            logger.error(f"[{self.name}] Error processing MQTT message: {e}")
+
+    def _on_internal_bus_update(self, **kwargs):
+        """Callback for internal bus events that need to be sent to the MQTT broker."""
+        # Find the original bus topic from the event (Topic detection depends on EventBus implementation)
+        # Assuming your Bus implementation can pass the topic or you use a specific callback
+        # For simplicity, this handles data destined for the broker:
+        try:
+            # We iterate to find which MQTT topic maps to this internal data
+            # In a more advanced version, use separate methods for each topic
+            for bus_topic, mqtt_topic in self._outgoing_map.items():
+                payload = json.dumps(kwargs)
+                self._client.publish(mqtt_topic, payload, qos=self.qos)
+                logger.debug(f"[{self.name}] Bus -> MQTT: {mqtt_topic}")
+        except Exception as e:
+            logger.error(f"[{self.name}] Error publishing to MQTT: {e}")
+
+    async def cleanup(self):
+        """Cleanly disconnect from the broker."""
+        logger.info(f"[{self.name}] Cleaning up MQTT resources...")
+        self._client.loop_stop()
+        self._client.disconnect()

@@ -2,8 +2,9 @@ import asyncio
 import json
 import serial
 import time
-from typing import Optional
-from pubsub import pub
+from typing import Optional, List
+
+from services.event_bus import EventBus
 from .base_service import BaseService
 from utils.logger import get_logger
 
@@ -11,142 +12,123 @@ logger = get_logger(__name__)
 
 class SerialService(BaseService):
     """
-    Servizio Seriale completo:
-    - Ascolta i cambiamenti di stato dal Controller (Pub/Sub).
-    - Invia l'ultimo stato noto ad Arduino a intervalli regolari (Loop).
-    - Legge i dati in arrivo da Arduino e li pubblica nel sistema.
+    Serial infrastructure adapter.
+    Handles hardware communication and translates between Serial data and Event Bus topics.
     """
 
-    def __init__(self, port: str, baudrate: int, send_interval: float = 0.5):
-        super().__init__("serial_service")
+    def __init__(self, port: str, baudrate: int, event_bus: EventBus, send_interval: float = 0.5):
+        super().__init__("serial_service", event_bus)
         self.port = port
         self.baudrate = baudrate
         self._send_interval = send_interval
         
-        # Stato del dispositivo (quello che Arduino deve sapere)
-        self._current_state: dict = {}
-        self._last_send_time = 0.0
-        
-        # Risorse hardware
+        # Internal state
         self._serial: Optional[serial.Serial] = None
         self._read_buffer = ""
+        self._last_state_received: dict = {}
+        self._last_send_time = 0.0
+        
+        # Messaging configuration (set via configure_messaging)
+        self._pub_topic: Optional[str] = None
 
-    def subscribe_topics(self):
-        """Si iscrive al topic per ricevere aggiornamenti dal Controller."""
-        # Il controller invierà: pub.sendMessage("serial.update_state", data={"key": "val"})
-        pub.subscribe(self._on_controller_update, "serial.update_state")
+    def configure_messaging(self, pub_topic: str, sub_topics: List[str]):
+        """
+        Configure the pub/sub wiring from the main entry point.
+        
+        :param pub_topic: The topic where serial data will be published.
+        :param sub_topics: List of topics this service should listen to.
+        """
+        self._pub_topic = pub_topic
+        for topic in sub_topics:
+            self.bus.subscribe(topic, self._on_bus_message)
+            logger.info(f"[{self.name}] Subscribed to topic: {topic}")
 
-    def _on_controller_update(self, data: dict):
-        """Callback eseguita quando il Controller pubblica un nuovo stato."""
-        if isinstance(data, dict):
-            self._current_state.update(data)
-            logger.debug(f"[{self.name}] Stato aggiornato internamente: {self._current_state}")
-        else:
-            logger.warning(f"[{self.name}] Ricevuti dati non validi dal Controller: {data}")
+    def _on_bus_message(self, **kwargs):
+        """Callback for incoming messages from the Event Bus."""
+        # Update the local state to be sent to hardware on next tick
+        self._last_state_received.update(kwargs)
 
     async def setup(self):
-        """Apertura della porta seriale in modalità non bloccante."""
+        """Open the serial port using a thread executor to avoid blocking."""
         try:
             loop = asyncio.get_running_loop()
-            # L'apertura fisica della porta è un'operazione bloccante: usiamo l'executor
             self._serial = await loop.run_in_executor(
                 None, 
-                lambda: serial.Serial(
-                    port=self.port, 
-                    baudrate=self.baudrate, 
-                    timeout=0.1,
-                    write_timeout=0.1
-                )
+                lambda: serial.Serial(port=self.port, baudrate=self.baudrate, timeout=0.1)
             )
-            logger.info(f"[{self.name}] Connesso alla porta {self.port} ({self.baudrate} baud).")
+            logger.info(f"[{self.name}] Port {self.port} opened successfully.")
         except Exception as e:
-            logger.error(f"[{self.name}] Impossibile aprire la porta {self.port}: {e}")
+            logger.error(f"[{self.name}] Failed to open port {self.port}: {e}")
             self._serial = None
 
     async def run(self):
-        """Ciclo principale di invio e ricezione."""
+        """Main loop managing periodic sending and continuous reading."""
         while self._running:
-            # Se la seriale non è pronta, attendiamo e riproviamo
             if self._serial is None or not self._serial.is_open:
-                await asyncio.sleep(2)
-                # Qui potresti chiamare di nuovo setup() per tentare la riconnessione
+                await asyncio.sleep(2)  # Wait before retry
                 continue
 
             try:
-                # 1. RICEZIONE: Legge i dati da Arduino
-                await self._read_from_serial()
+                # 1. Read from Hardware
+                await self._read_serial_data()
 
-                # 2. INVIO PERIODICO: Invia lo stato ad Arduino ogni 'send_interval'
-                current_time = time.monotonic()
-                if current_time - self._last_send_time >= self._send_interval:
-                    await self._send_to_serial(self._current_state)
-                    self._last_send_time = current_time
+                # 2. Periodic Write to Hardware (Heartbeat/State sync)
+                now = time.monotonic()
+                if now - self._last_send_time >= self._send_interval:
+                    await self._write_serial_data(self._last_state_received)
+                    self._last_send_time = now
 
             except Exception as e:
-                logger.error(f"[{self.name}] Errore critico nel ciclo run: {e}")
-                # Se l'errore è grave (es. cavo staccato), resettiamo la seriale
-                if "device" in str(e).lower() or "io" in str(e).lower():
-                    self._serial = None
+                logger.error(f"[{self.name}] Error in run loop: {e}")
+                self._serial = None  # Force reconnection logic
 
-            await asyncio.sleep(0.01) # Impedisce la saturazione della CPU
+            await asyncio.sleep(0.01)
 
-    async def _read_from_serial(self):
-        """Gestisce la lettura asincrona dei dati in entrata."""
+    async def _read_serial_data(self):
+        """Non-blocking read from the serial port."""
         if self._serial is None: return
         
         loop = asyncio.get_running_loop()
-        ser = self._serial # Riferimento locale per evitare problemi di Type Checking
+        ser = self._serial # Local reference for thread-safety
         
         try:
-            # Controlla quanti byte sono nel buffer hardware
             waiting = await loop.run_in_executor(None, lambda: ser.in_waiting)
-            
             if waiting > 0:
-                raw_data = await loop.run_in_executor(None, lambda: ser.read(waiting))
-                self._read_buffer += raw_data.decode('utf-8', errors='ignore')
+                raw = await loop.run_in_executor(None, lambda: ser.read(waiting))
+                self._read_buffer += raw.decode('utf-8', errors='ignore')
                 
-                # Elabora le linee complete nel buffer
                 while '\n' in self._read_buffer:
                     line, self._read_buffer = self._read_buffer.split('\n', 1)
-                    await self._handle_incoming_json(line.strip())
+                    await self._process_incoming_line(line.strip())
         except Exception as e:
-            logger.error(f"[{self.name}] Errore lettura seriale: {e}")
+            logger.error(f"[{self.name}] Read error: {e}")
             self._serial = None
 
-    async def _handle_incoming_json(self, line: str):
-        """Decodifica il messaggio da Arduino e lo pubblica sul bus interno."""
-        if not line: return
+    async def _process_incoming_line(self, line: str):
+        """Parse JSON from hardware and publish to the Event Bus."""
+        if not line or not self._pub_topic: return
         try:
             data = json.loads(line)
-            # Notifica il resto del sistema (es. il Controller o un Database)
-            pub.sendMessage("serial.data_received", payload=data)
-            logger.debug(f"[{self.name}] <== Ricevuto da Arduino: {data}")
+            # Publish using the topic injected from main
+            self.bus.publish(self._pub_topic, **data)
         except json.JSONDecodeError:
-            logger.warning(f"[{self.name}] Stringa non JSON ricevuta: {line}")
+            logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 
-    async def _send_to_serial(self, data: dict):
-        """Invia fisicamente il pacchetto JSON ad Arduino."""
+    async def _write_serial_data(self, data: dict):
+        """Send the current state as JSON to the hardware."""
         if self._serial is None: return
-        
         try:
             loop = asyncio.get_running_loop()
             ser = self._serial
-            # Arduino si aspetta spesso un terminatore di riga \n
             payload = (json.dumps(data) + '\n').encode('utf-8')
-            
             await loop.run_in_executor(None, lambda: ser.write(payload))
             await loop.run_in_executor(None, ser.flush)
-            logger.debug(f"[{self.name}] ==> Inviato ad Arduino: {data}")
         except Exception as e:
-            logger.error(f"[{self.name}] Errore scrittura seriale: {e}")
+            logger.error(f"[{self.name}] Write error: {e}")
             self._serial = None
 
     async def cleanup(self):
-        """Chiude le risorse prima dello spegnimento."""
-        if self._serial and self._serial.is_open:
-            try:
-                self._serial.close()
-                logger.info(f"[{self.name}] Porta seriale chiusa correttamente.")
-            except:
-                pass
-        self._serial = None
+        """Ensure the serial port is closed on shutdown."""
+        if self._serial:
+            self._serial.close()
+            logger.info(f"[{self.name}] Serial port closed.")

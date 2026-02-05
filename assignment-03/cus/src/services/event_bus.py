@@ -6,33 +6,27 @@ logger = get_logger(__name__)
 
 class EventBus:
     """
-    Wrapper intorno a PyPubSub che nasconde l'implementazione specifica.
-    Gestisce la comunicazione tra Infrastructure Layer e Core Domain.
+    Instance-based Event Bus wrapper.
+    Hides pypubsub and allows true Dependency Injection.
     """
 
-    @staticmethod
-    def publish(topic: str, **kwargs):
-        """
-        Invia un evento nel sistema.
-        :param topic: Stringa identificativa (es. 'POT_VAL', 'VALVE_CMD')
-        :param kwargs: Dati associati all'evento
-        """
-        try:
-            # Nascondiamo la chiamata sendMessage di pypubsub
-            pub.sendMessage(topic, **kwargs)
-            logger.debug(f"[Bus] Publicato topic: {topic} con dati: {kwargs}")
-        except Exception as e:
-            logger.error(f"[Bus] Errore durante la pubblicazione su {topic}: {e}")
+    def __init__(self):
+        # We use the global pub instance internally, 
+        # but the services only interact with this wrapper instance.
+        self._engine = pub
 
-    @staticmethod
-    def subscribe(topic: str, callback: Callable):
-        """
-        Registra un listener per un determinato topic.
-        :param topic: Il tipo di evento da ascoltare
-        :param callback: La funzione da eseguire al ricevimento dell'evento
-        """
+    def publish(self, topic: str, **kwargs):
+        """Publish an event to a specific topic."""
         try:
-            pub.subscribe(callback, topic)
-            logger.info(f"[Bus] Sottoscrizione registrata per topic: {topic}")
+            self._engine.sendMessage(topic, **kwargs)
+            logger.debug(f"[Bus] Published to {topic} with {kwargs}")
         except Exception as e:
-            logger.error(f"[Bus] Errore durante la sottoscrizione a {topic}: {e}")
+            logger.error(f"[Bus] Error publishing to {topic}: {e}")
+
+    def subscribe(self, topic: str, callback: Callable):
+        """Subscribe a listener to a specific topic."""
+        try:
+            self._engine.subscribe(callback, topic)
+            logger.info(f"[Bus] New subscription on: {topic}")
+        except Exception as e:
+            logger.error(f"[Bus] Error subscribing to {topic}: {e}")
