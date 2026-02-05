@@ -1,6 +1,8 @@
 import asyncio
+from collections import deque
+from collections import deque
 import time
-from typing import List
+from typing import Deque, List
 from services.base_service import BaseService
 from services.event_bus import EventBus
 from models.schemas import LevelReading
@@ -33,11 +35,9 @@ class TankController(BaseService):
         self._current_state: SystemStateBase = UnconnectedState()
         self._last_level_timestamp = time.time()  # Unix timestamp in seconds
         # Track last value from each source (who) for pot
-        self._pot_sources: dict[str, float] = {}  # {source_id: last_value}
-        self._last_pot_value: float = 0.0
-        self.source_id: str = ""
+        self._last_pot_msg: dict[str, float] = {}  # {source_id: last_value}
         # Water level history
-        self._water_levels: List[LevelReading] = []
+        self._water_levels: Deque[LevelReading] = deque(maxlen=20)
         
         # NOTE: Topic subscriptions are done in main.py, not here
         
@@ -61,7 +61,7 @@ class TankController(BaseService):
 
     def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
-        #print(f"[{self.name}] 📊 Level event received: {reading}")
+        print(f"[{self.name}] 📊 Level event received: {reading}")
 
         # Update timestamp
         logger.info(f"[{self.name}] Level event received: {reading}")
@@ -69,7 +69,7 @@ class TankController(BaseService):
         # Store in history
         measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
-        
+        self.bus.publish(config.LEVELS_OUT_TOPIC, levels=self._water_levels)
         #print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
         
         # Delegate to state
@@ -95,10 +95,10 @@ class TankController(BaseService):
         if isinstance(pot, dict) and "val" in pot and "who" in pot:
             value = pot["val"]
             source_id = pot["who"]
-        else:
-            value = pot
-            source_id = "legacy"
-        self._current_state.handle_manual_valve(value, self)
+            if source_id in self._last_pot_msg and abs(value - self._last_pot_msg[source_id]) < config.TOLERANCE:
+                return
+            self._last_pot_msg[source_id] = value
+            self._current_state.handle_manual_valve(value, self)
 
     def transition_to(self, new_state: SystemStateBase):
         """

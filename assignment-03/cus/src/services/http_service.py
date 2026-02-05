@@ -1,9 +1,12 @@
 import asyncio
+from collections import deque
+from collections import deque
 import time
 import uvicorn
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Callable, Any, Dict, List, Optional
+from typing import Callable, Any, Dict, Optional
+import config
 
 from services.event_bus import EventBus
 from .base_service import BaseService
@@ -33,7 +36,6 @@ class HttpService(BaseService):
                  publish_interval: float = 10.0, api_prefix: str = ""):
         """
         Initialize the HTTP service.
-        
         :param event_bus: Injected instance of CusEventBus.
         :param host: Server host address.
         :param port: Server port.
@@ -46,11 +48,7 @@ class HttpService(BaseService):
         self._publish_interval = publish_interval
         self._last_publish_time = 0.0
         self._api_prefix = api_prefix.rstrip('/')  # Remove trailing slash
-        
-        # Internal state to hold the latest data from the Bus
-        self._state: Dict[str, Any] = {}
-        # Periodic publishing: topic -> data generator callable
-        self._publish_topics: Dict[str, Callable] = {}
+        self._latest_received: Dict[str, Any] = {}
         
         # FastAPI Application Setup
         self._app = FastAPI(
@@ -58,6 +56,7 @@ class HttpService(BaseService):
             description="Interface for monitoring and controlling the system",
             version="1.0.0",
         )
+        
         
         self._app.add_middleware(
             CORSMiddleware,
@@ -69,76 +68,55 @@ class HttpService(BaseService):
         
         self._server: Optional[uvicorn.Server] = None
         self._server_task: Optional[asyncio.Task] = None
+        self._setup_routes()
         logger.info(f"[{self.name}] Initialized on {host}:{port}")
 
-    def configure_messaging(self, watched_topics: Optional[List[str]] = None):
-        """
-        Define which Event Bus topics should update the internal API state.
+    def _setup_routes(self):
+        # Usiamo il riferimento a self all'interno del decoratore
+        @self._app.get("/api/v1/mode")
+        async def get_mode():
+            # Qui 'self' è accessibile perché get_mode è definita 
+            # nel raggio d'azione (scope) di _setup_routes
+            data = self._latest_received.get("mode")
+            return {
+                "mode": data,
+                "timestamp": time.time()
+            }
         
-        :param watched_topics: List of topics to subscribe to.
-        """
-        if watched_topics:
-            for topic in watched_topics:
-                # Crea callback dedicata per ogni topic
-                callback = self._make_state_updater(topic)
-                self.bus.subscribe(topic, callback)
-                logger.info(f"[{self.name}] Watching topic: {topic}")
-
-    def _make_state_updater(self, topic: str):
-        """Factory per creare callback specifiche per ogni topic."""
-        def handler(**kwargs):
-            # Salva i dati sotto la chiave del topic
-            if topic not in self._state:
-                self._state[topic] = {}
-            self._state[topic].update(kwargs)
-            logger.debug(f"[{self.name}] State[{topic}] updated: {kwargs}")
-        return handler
-
-    def get_current_state(self) -> Dict[str, Any]:
-        """Helper method for handlers to access the latest data."""
-        return self._state
-
-    def register_endpoint(self, method: str, path: str, handler: Callable):
-        """
-        Dynamically register a route. 
-        Note: The handler can access self.get_current_state() or self.bus.publish().
-        """
-        method = method.upper()
-        if method == "GET":
-            self._app.get(path)(handler)
-        elif method == "POST":
-            self._app.post(path)(handler)
-        # ... other methods ...
-        return self
-    
-    def map_topic_to_endpoint(self, topic: str, method: str = "POST"):
-        """
-        Crea automaticamente un endpoint HTTP che pubblica sul topic specificato.
+        @self._app.get("/api/v1/levels")
+        async def get_levels():
+            data = self._latest_received.get("levels", [])
+            return {
+                "levels": data,
+                "timestamp": time.time()
+            }
         
-        :param topic: Topic del bus (es. "cmd.valve")
-        :param method: Metodo HTTP ("POST" o "GET")
+        @self._app.get("/api/v1/valve")
+        async def get_valve():
+            data = self._latest_received.get("valve", 0.0)
+            return {
+                "valve": data,
+                "timestamp": time.time()
+            }
         
-        Esempio:
-            map_topic_to_endpoint("cmd.valve", "POST")
-            → Crea POST /api/v1/cmd/valve che pubblica su "cmd.valve"
-        """
-        path = f"{self._api_prefix}/{topic.replace('.', '/')}"
+        @self._app.post("/api/v1/pot")
+        async def set_valve(payload: dict):
+            """
+            Riceve un JSON tipo: {"pot":{"val": X, "who": "source_id"}}
+            E lo pubblica sull'Event Bus.
+            """
+            pot = payload.get("pot")
+            
+            if pot is not None:
+                # PUBBLICHIAMO SUL BUS (Inverso di quello che facevi prima)
+                # Il topic sarà quello che il Controller sta ascoltando
+                self.bus.publish(config.POT_TOPIC, pot=pot)
+                
+                return {"status": "success", "sent": pot}
+            
+            return {"status": "error", "message": "Missing pot value"}, 400
         
-        if method.upper() == "POST":
-            @self._app.post(path)
-            async def post_handler(data: Dict[str, Any] = Body(...)):
-                logger.info(f"[{self.name}] POST {path} → bus.publish('{topic}')")
-                self.bus.publish(topic, **data)
-                return {"status": "ok", "topic": topic, "data": data}
         
-        elif method.upper() == "GET":
-            @self._app.get(path)
-            async def get_handler():
-                # Restituisce lo stato corrente per questo topic
-                return {topic: self._state.get(topic, self._state)}
-        
-        logger.info(f"[{self.name}] Mapped {method.upper()} {path} → topic '{topic}'")
-        return self
     
     def configure_periodic_publishing(self, topic: str, data_generator: Callable):
         """
@@ -201,3 +179,18 @@ class HttpService(BaseService):
             self._server.should_exit = True
             # The base class stop() will cancel the task, which triggers serve() cleanup
         await super().stop()
+
+    def on_valve_update(self, opening: float):
+        """Callback for valve updates from the Event Bus."""
+        logger.info(f"[{self.name}] Valve update received: {opening}")
+        self._latest_received["valve"] = opening
+
+    def on_mode_update(self, mode: str):
+        """Callback for mode updates from the Event Bus."""
+        logger.info(f"[{self.name}] Mode update received: {mode}")
+        self._latest_received["mode"] = mode
+    
+    def on_levels_out(self, levels: deque):
+        """Callback for levels updates from the Event Bus."""
+        logger.info(f"[{self.name}] Levels update received: {levels}")
+        self._latest_received["levels"] = levels
