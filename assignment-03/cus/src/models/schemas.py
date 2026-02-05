@@ -11,6 +11,15 @@ class SystemState(str, Enum):
     MANUAL = "MANUAL"
     UNCONNECTED = "UNCONNECTED"
 
+class AutomaticState(str, Enum):
+    """
+    Sub-states when in AUTOMATIC mode.
+    """
+    NORMAL = "NORMAL"
+    TRACKING_PRE_ALARM = "TRACKING_PRE_ALARM"
+    PRE_ALARM = "PRE_ALARM"
+    ALARM = "ALARM"
+
 
 class ValveRequest(BaseModel):
     """
