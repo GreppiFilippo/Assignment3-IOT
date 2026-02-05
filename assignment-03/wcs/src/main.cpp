@@ -21,7 +21,6 @@ Context* pContext;
 void setup() {
   MsgService.init(BAUD_RATE);
   sched.init(SCHED_BASE_PERIOD);
-  Logger.log(F(":::::: Water Channel Subsystem ::::::"));
 
   pHWPlatform = new HWPlatform();
   pHWPlatform->init();
@@ -46,6 +45,8 @@ void setup() {
   sched.addTask(pMsgTask);
   sched.addTask(pValveTask);
   sched.addTask(pLcdTask);
+
+  Logger.log(F(":::::: Water Channel Subsystem ::::::"));
 #else
   /* Testing */
   Task* pTestHWTask = new TestHWTask(pHWPlatform);
