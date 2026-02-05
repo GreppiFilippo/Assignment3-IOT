@@ -3,102 +3,19 @@
 #include <ArduinoJson.h>
 
 #include "config.hpp"
-#include "kernel/Logger.hpp"
-
-// Command table definition
-const Context::CmdEntry Context::cmdTable[] = {
-    {"set_valve", &Context::cmdSetValve},
-    {"set_mode", &Context::cmdSetMode},
-};
 
 Context::Context() {
-  this->mode = UNCONNECTED;
-  this->valveOpening = 0;
-  this->potValue = 0.0;
+  this->receivedValve = 0;
+  this->lastValidMsgTimestamp = 0;
+  this->lastMsgSentTimestamp = 0;
   this->buttonPressed = false;
-  
+
   for (uint8_t i = 0; i < LCD_ROWS; i++) {
     this->lcdLines[i][0] = '\0';
   }
-
-  // Initialize command buffers
-  this->valveCmd.pending = false;
-  this->valveCmd.position = 0;
-  this->valveCmd.timestamp = 0;
-
-  this->modeCmd.pending = false;
-  this->modeCmd.mode = UNCONNECTED;
-  this->modeCmd.timestamp = 0;
 }
 
-// ============ Command Handlers ============
-
-void Context::cmdSetValve(JsonDocument& doc) {
-  if (doc.containsKey("value")) {
-    unsigned int pos = doc["value"];
-    if (pos <= 100) {  // Validate range
-      valveCmd.pending = true;
-      valveCmd.position = pos;
-      valveCmd.timestamp = millis();
-      Logger.log(F("CMD_VALVE_OK"));
-    } else {
-      Logger.log(F("CMD_VALVE_RANGE"));
-    }
-  }
-}
-
-void Context::cmdSetMode(JsonDocument& doc) {
-  if (doc.containsKey("value")) {
-    const char* modeStr = doc["value"];
-    Mode newMode;
-
-    if (strcmp(modeStr, "AUTOMATIC") == 0) {
-      newMode = AUTOMATIC;
-    } else if (strcmp(modeStr, "MANUAL") == 0) {
-      newMode = MANUAL;
-    } else if (strcmp(modeStr, "UNCONNECTED") == 0) {
-      newMode = UNCONNECTED;
-    } else {
-      Logger.log(F("CMD_MODE_INVALID"));
-      return;
-    }
-
-    modeCmd.pending = true;
-    modeCmd.mode = newMode;
-    modeCmd.timestamp = millis();
-    Logger.log(F("CMD_MODE_OK"));
-  }
-}
-
-// ============ Command Consumption ============
-
-bool Context::hasValveCommand() { return valveCmd.pending; }
-
-unsigned int Context::consumeValveCommand() {
-  valveCmd.pending = false;
-  return valveCmd.position;
-}
-
-bool Context::hasModeCommand() { return modeCmd.pending; }
-
-Context::Mode Context::consumeModeCommand() {
-  modeCmd.pending = false;
-  return modeCmd.mode;
-}
-
-// ============ State Getters ============
-
-Context::Mode Context::getMode() const { return mode; }
-
-unsigned int Context::getValveTargetPosition() const { return valveOpening; }
-
-bool Context::wasButtonPressed() {
-  bool pressed = buttonPressed;
-  buttonPressed = false;  // Reset after read
-  return pressed;
-}
-
-float Context::getPotValue() const { return potValue; }
+unsigned int Context::getReceivedValvePosition() const { return receivedValve; }
 
 const char* Context::getLCDLine(uint8_t line) const {
   if (line >= LCD_ROWS) {
@@ -107,38 +24,60 @@ const char* Context::getLCDLine(uint8_t line) const {
   return lcdLines[line];
 }
 
-// ============ State Setters ============
-
-void Context::setRequestedValveOpening(unsigned int opening) {
-  if (this->valveOpening != opening) {
-    this->valveOpening = opening;
-    char buf[20];
-    snprintf(buf, sizeof(buf), "Valve: %d%%", opening);
-    this->setLCDLine(VALVE_LINE, buf);
-  }
+unsigned long Context::getLastValidReceivedMsgTimestamp() const {
+  return lastValidMsgTimestamp;
 }
 
-void Context::setPotValueToValidate(float value) { this->potValue = value; }
+unsigned long Context::getLastMsgSentTimestamp() const {
+  return lastMsgSentTimestamp;
+}
 
-void Context::setButtonPressed() { this->buttonPressed = true; }
+void Context::setReceivedValvePosition(unsigned int valve) {
+  receivedValve = valve;
+}
 
 void Context::setLCDLine(uint8_t line, const char* msg) {
   if (line >= LCD_ROWS) {
-    Logger.log(F("LCD_LINE_ERR"));
     return;
   }
   strncpy(lcdLines[line], msg, LCD_COLS);
   lcdLines[line][LCD_COLS] = '\0';
 }
 
-void Context::setMode(Mode mode) { this->mode = mode; }
+void Context::setLastValidReceivedMsgTimestamp(unsigned long timestamp) {
+  lastValidMsgTimestamp = timestamp;
+}
 
-// ============ Command Registry ============
+void Context::setLastMsgSentTimestamp(unsigned long timestamp) {
+  lastMsgSentTimestamp = timestamp;
+}
 
-const Context::CmdEntry* Context::getCmdTable() { return cmdTable; }
+size_t Context::serializeData(void* commonBuf, size_t bufSize) {
+  return serializeJson(jsonDoc, commonBuf, bufSize);
+}
 
-int Context::getCmdTableSize() { return sizeof(cmdTable) / sizeof(CmdEntry); }
+void Context::clearData() { jsonDoc.clear(); }
 
-unsigned long Context::getLastValidMsgTimestamp() {
-  return this->lastValidMsgTimestamp;
+void Context::setField(const char* key, bool value) { jsonDoc[key] = value; }
+
+void Context::setField(const char* key, int value) { jsonDoc[key] = value; }
+
+void Context::setField(const char* key, unsigned int value) {
+  jsonDoc[key] = value;
+}
+
+void Context::setButtonPressed(bool pressed) {
+  if (pressed) {
+    buttonPressed = true;
+  }
+}
+
+bool Context::consumeButtonPressed() {
+  bool result = buttonPressed;
+  buttonPressed = false;
+  return result;
+}
+
+StaticJsonDocument<INPUT_JSON_SIZE>& Context::getReceivedJson() {
+  return receivedJson;
 }
