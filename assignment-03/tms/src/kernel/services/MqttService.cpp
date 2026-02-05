@@ -34,7 +34,9 @@ void MqttService::connect()
         }
         else
         {
-            Logger.log(String("[MQTT] Failed: ") + String(this->mqttClient.state()));
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "[MQTT] Failed: %d", this->mqttClient.state());
+            Logger.log(buffer);
             this->connected = false;
         }
     }

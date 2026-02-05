@@ -36,7 +36,7 @@ void NetworkTask::tick()
 
             // Connect network layer first
             this->pNetworkService->connect();
-            
+
             // Then connect protocol layer
             if (this->pNetworkService->isConnected())
             {
@@ -45,10 +45,14 @@ void NetworkTask::tick()
                 if (this->pProtocolService->isConnected())
                 {
                     this->setState(NETWORK_OK);
-                } else {
+                }
+                else
+                {
                     this->setState(NETWORK_ERROR);
                 }
-            } else {
+            }
+            else
+            {
                 this->setState(NETWORK_ERROR);
             }
             break;
@@ -131,18 +135,21 @@ void NetworkTask::sendData()
 
     Message** msgs = this->pContext->getMessages();
     int sentCount = 0;
-    
+    char buffer[128];
     for (int i = 0; msgs[i] != nullptr; i++)
     {
         if (this->pProtocolService->send(msgs[i]))
         {
-            Logger.log(String("[NT] Sent message: topic=") + String(msgs[i]->topic) + 
-                      String(" payload=") + String(msgs[i]->payload));
+            snprintf(buffer, sizeof(buffer), "[NT] Sent message: topic=%s payload=%s",
+                     msgs[i]->topic, msgs[i]->payload);
+            Logger.log(buffer);
             sentCount++;
         }
         else
         {
-            Logger.log(String("[NT] Failed to send message: topic=") + String(msgs[i]->topic));
+            snprintf(buffer, sizeof(buffer), "[NT] Failed to send message: topic=%s",
+                     msgs[i]->topic);
+            Logger.log(buffer);
         }
     }
 
@@ -150,6 +157,7 @@ void NetworkTask::sendData()
     if (sentCount > 0)
     {
         this->pContext->clearMessages();
-        Logger.log(String("[NT] Cleared ") + String(sentCount) + String(" messages"));
+        snprintf(buffer, sizeof(buffer), "[NT] Cleared %d messages", sentCount);
+        Logger.log(buffer);
     }
 }

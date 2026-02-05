@@ -14,7 +14,7 @@ void Context::setWaterLevel(float level, unsigned long timestamp)
 {
     this->waterLevel = level;
 
-    // Costruzione JSON
+    // JSON construction
     char payload[PAYLOAD_SIZE];
     snprintf(payload, PAYLOAD_SIZE, "{\"reading\":{\"level\":%.2f,\"timestamp\":%lu}}", level,
              timestamp);
