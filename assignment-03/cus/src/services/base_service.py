@@ -1,67 +1,86 @@
 from abc import ABC, abstractmethod
 import asyncio
+from pubsub import pub  # Assumendo l'uso di PyPubSub
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-
 class BaseService(ABC):
     """
-    Abstract base class for all services (MQTT, Serial, HTTP, etc.).
-    Handles async start/stop and controlled looping.
+    Base class for services with lifecycle management and Pub/Sub integration.
     """
 
-    def __init__(self, name: str, event_dispatcher=None):
+    def __init__(self, name: str):
         """
-        Initialize the service.
+        Initialize the service with a given name.
         
-        :param name: Name of the service
-        :param event_dispatcher: (Deprecated) Not used with PyPubSub
+        :param self: the instance itself
+        :param name: the name of the service
+        :type name: str
         """
         self.name = name
-        self.event_dispatcher = event_dispatcher  # Keep for backward compat but unused
         self._running = False
         self._task: asyncio.Task | None = None
 
     async def start(self):
-        """Start the service by creating an async task."""
+        """Start the service lifecycle."""
         if self._running:
-            logger.warning(f"{self.name} is already running")
+            logger.warning(f"[{self.name}] Already running.")
             return
-        logger.info(f"Starting {self.name}")
+        
         self._running = True
-        # Wrapper handles exceptions and cancellation
+        # Register Pub/Sub listeners before starting the task
+        self.subscribe_topics()
         self._task = asyncio.create_task(self._run_wrapper())
+        logger.info(f"[{self.name}] Service started.")
 
     async def stop(self):
-        """Stop the service cleanly."""
+        """Stop the service and clean up resources."""
         if not self._running:
-            logger.warning(f"{self.name} is already stopped")
             return
-        logger.info(f"Stopping {self.name}")
+
+        logger.info(f"[{self.name}] Shutting down...")
         self._running = False
+        
         if self._task:
             self._task.cancel()
-            # Prevent unhandled exceptions on cancelled task
-            await asyncio.gather(self._task, return_exceptions=True)
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
             self._task = None
+        
+        await self.cleanup()
+        logger.info(f"[{self.name}] Service stopped.")
 
     async def _run_wrapper(self):
-        """
-        Internal wrapper for the run() method.
-        Catches exceptions and cancellation for safe execution.
-        """
+        """Wrapper to handle setup and main loop."""
         try:
+            await self.setup()
             await self.run()
         except asyncio.CancelledError:
-            logger.info(f"{self.name} task cancelled")
+            logger.debug(f"[{self.name}] Task cancelled successfully.")
         except Exception as e:
-            logger.exception(f"Exception in {self.name}: {e}")
+            logger.exception(f"[{self.name}] Critical error: {e}")
+        finally:
+            self._running = False
+
+    def subscribe_topics(self):
+        """
+        Override to register listeners (pub.subscribe).
+        Called automatically on start().
+        """
+        pass
+
+    async def setup(self):
+        """Initialization logic (e.g., DB/Network connections)."""
+        pass
+
+    async def cleanup(self):
+        """Cleanup logic (e.g., closing sockets)."""
+        pass
 
     @abstractmethod
     async def run(self) -> None:
-        """
-        Abstract method to be implemented by concrete services.
-        Should use the self._running flag for controlled loops.
-        """
+        """Main loop or waiting logic of the service."""
         pass
