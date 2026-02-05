@@ -1,112 +1,103 @@
 import asyncio
 import time
+from typing import List
 from services.base_service import BaseService
 from services.event_bus import EventBus
-from models.schemas import SystemState, AutomaticState
+from models.schemas import LevelReading
+from utils.logger import get_logger
 import config
 
+# Import system states after config to avoid circular dependency
+from core.system_states import SystemStateBase, UnconnectedState
+
+logger = get_logger(__name__)
+
+
 class TankController(BaseService):
-    """Core Controller for Tank System."""
+    """
+    Minimal FSM Controller (State Pattern).
+    
+    Responsibilities:
+    - Maintain current system state
+    - Store water level history
+    - Delegate events to current state
+    - Track timestamps for timeout checks
+    
+    All business logic is in state classes.
+    """
 
     def __init__(self, event_bus: EventBus):
         super().__init__("tank_controller", event_bus)
-        self.water_level: float = 0.0
-        self.set_system_state(SystemState.UNCONNECTED)
-        self.set_automatic_state(AutomaticState.NORMAL)
-        self.valve_opening: float = 0.0
-        self.change = False
-        self.last_level_timestamp: int = 0
+        
+        # State management
+        self._current_state: SystemStateBase = UnconnectedState()
+        self._last_level_timestamp = int(time.monotonic() * 1000)
+        
+        # Water level history
+        self._water_levels: List[LevelReading] = []
+        
+        # Subscribe to domain events
+        self.bus.subscribe("sensor.level", self._on_level_event)
+        self.bus.subscribe("button.pressed", self._on_button_pressed)
+        self.bus.subscribe("manual.valve_command", self._on_manual_valve)
+        
+        logger.info(f"[{self.name}] FSM initialized: {self._current_state.get_state_name()}")
 
     async def run(self):
-        """Main execution loop for the Tank Controller."""
+        """
+        Event-driven FSM: reacts to events via pubsub callbacks.
+        Periodic loop only checks for connectivity timeout.
+        """
         while self._running:
-            match self.model.state:
-                case SystemState.UNCONNECTED:
-                    if self.check_and_set_just_entered_system_state():
-                        self.event_bus.publish(config.MODE, SystemState.UNCONNECTED)
-                case SystemState.AUTOMATIC:
-                    match self.model.automatic_state:
-                        case AutomaticState.NORMAL:
-                            if self.check_and_set_just_entered_automatic_state():
-                                self.event_bus.publish(config.MODE, SystemState.AUTOMATIC)
-                            if self.model.valve_opening  > config.L1_THRESHOLD and self.model.valve_opening  < config.L2_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.TRACKING_PRE_ALARM)
-                        case AutomaticState.TRACKING_PRE_ALARM:
-                            if self.elapsed_time_in_automatic_state() > config.T1_DURATION * 1000:
-                                self.set_automatic_state(AutomaticState.PRE_ALARM)
-                            if self.model.valve_opening  <= config.L1_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.NORMAL)
-                            if self.model.valve_opening  >= config.L2_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.ALARM)
-                        case AutomaticState.PRE_ALARM:
-                            if self.check_and_set_just_entered_automatic_state():
-                                self.model.valve_opening = 50.0
-                            if self.model.valve_opening  > config.L2_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.ALARM)
-                            if self.model.valve_opening  <= config.L1_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.NORMAL)
-                        case AutomaticState.ALARM:
-                            if self.check_and_set_just_entered_automatic_state():
-                                self.model.valve_opening = 100.0
-                            if self.model.valve_opening  <= config.L2_THRESHOLD:
-                                self.set_automatic_state(AutomaticState.PRE_ALARM)
-                    if self.button:
-                        self.set_system_state(SystemState.MANUAL)
-                        self.button = False
-                    if time.monotonic() * 1000 - self.last_level_timestamp > config.LEVEL_TIMEOUT * 1000:
-                        self.set_system_state(SystemState.UNCONNECTED)
-                case SystemState.MANUAL:
-                    self.check_and_set_just_entered_system_state()
-                    if self.button:
-                        self.set_system_state(SystemState.AUTOMATIC)
-                        self.button = False
-                    if time.monotonic() * 1000 - self.last_level_timestamp > config.LEVEL_TIMEOUT * 1000:
-                        self.set_system_state(SystemState.UNCONNECTED)
-            await asyncio.sleep(0.1)
+            # Check timeout
+            elapsed_ms = int(time.monotonic() * 1000) - self._last_level_timestamp
+            self._current_state.check_timeout(elapsed_ms, self)
+            
+            await asyncio.sleep(1.0)
 
-    def set_change(self):
-        """Change mode"""
-        self.change = True
+    def _on_level_event(self, level, timestamp):
+        """Delegate sensor.level event to current state."""
+        # Store in history
+        reading = LevelReading(water_level=level, timestamp=timestamp)
+        self._water_levels.append(reading)
+        
+        # Update timestamp
+        self._last_level_timestamp = int(time.monotonic() * 1000)
+        
+        # Delegate to state
+        self._current_state.handle_level_event(level, timestamp, self)
 
-    def set_valve_opening(self, opening: float):
-        """Set valve opening percentage."""
-        self.valve_opening = opening
+    def _on_button_pressed(self, **kwargs):
+        """Delegate button.pressed event to current state."""
+        self._current_state.handle_button_pressed(self)
 
-    def set_water_level(self, level: float):
-        """Set current water level."""
-        self.water_level = level
-        self.last_level_timestamp = int(time.monotonic() * 1000)
+    def _on_manual_valve(self, **kwargs):
+        """Delegate manual.valve_command event to current state."""
+        opening = kwargs.get("opening", 0.0)
+        self._current_state.handle_manual_valve(opening, self)
 
-    # State-management helpers similar to DroneTask
-    def set_system_state(self, state: SystemState):
-        self._system_state = state
-        self._system_state_timestamp = int(time.monotonic() * 1000)
-        self.set_automatic_state(AutomaticState.NORMAL)
-        self._system_just_entered = True
+    def transition_to(self, new_state: SystemStateBase):
+        """
+        Transition to a new system state.
+        Called by states themselves (not by external code).
+        """
+        old_state = self._current_state
+        old_state.on_exit(self)
+        
+        self._current_state = new_state
+        logger.info(f"State transition: {old_state.get_state_name().value} → {new_state.get_state_name().value}")
+        
+        new_state.on_enter(self)
 
-    def elapsed_time_in_system_state(self) -> int:
-        return int(time.monotonic() * 1000) - getattr(self, "_system_state_timestamp", 0)
-
-    def check_and_set_just_entered_system_state(self) -> bool:
-        bak = bool(getattr(self, "_system_just_entered", False))
-        if bak:
-            self._system_just_entered = False
-        return bak
-
-    def set_automatic_state(self, state: AutomaticState):
-        self._automatic_state = state
-        self._automatic_state_timestamp = int(time.monotonic() * 1000)
-        self._automatic_just_entered = True
-
-    def elapsed_time_in_automatic_state(self) -> int:
-        return int(time.monotonic() * 1000) - getattr(self, "_automatic_state_timestamp", 0)
-
-    def check_and_set_just_entered_automatic_state(self) -> bool:
-        bak = bool(getattr(self, "_automatic_just_entered", False))
-        if bak:
-            self._automatic_just_entered = False
-        return bak
-
+    # Public accessors for status queries
+    @property
+    def state(self):
+        return self._current_state.get_state_name()
     
-
-
+    @property
+    def water_levels(self) -> List[LevelReading]:
+        return self._water_levels
+    
+    @property
+    def current_level(self) -> float:
+        return self._water_levels[-1].water_level if self._water_levels else 0.0

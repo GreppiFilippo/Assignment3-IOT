@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
-from src.services.event_bus import EventBus
+from services.event_bus import EventBus
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
