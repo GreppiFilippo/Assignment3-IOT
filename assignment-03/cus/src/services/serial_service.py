@@ -28,13 +28,12 @@ class SerialService(BaseService):
         self._read_buffer = ""
         self._last_state_received: dict = {
             'mode': 'UNCONNECTED',  # Valore iniziale
-            'valve_opening': 0.0     # Valore iniziale
+            'valve': 0.0     # Valore iniziale
         }
         self._last_send_time = 0.0
         
         # Mapping from serial keys to event bus topics
         self._pub_topics: Dict[str, str] = {
-            "level": "level_in",
             "pot": "pot",
             "btn": "btn"
         }
@@ -140,10 +139,16 @@ class SerialService(BaseService):
         
     def on_mode_change(self, mode: str):
         """Update internal state based on mode changes from the Event Bus."""
-        print(f"[{self.name}] 🔄 Mode change received: {mode}")
-        self._last_state_received[MODE_TOPIC] = mode
+        # Convert enum to string if necessary
+        if hasattr(mode, 'value'):
+            mode_str = mode.value
+        else:
+            mode_str = str(mode)
+        
+        print(f"[{self.name}] 🔄 Mode change received: {mode_str}")
+        self._last_state_received['mode'] = mode_str
 
     def on_valve_command(self, opening: float):
         """Update internal state based on valve commands from the Event Bus."""
         print(f"[{self.name}] 🎚️  Valve command received: {opening}")
-        self._last_state_received[OPENING_TOPIC] = opening
+        self._last_state_received['valve'] = opening

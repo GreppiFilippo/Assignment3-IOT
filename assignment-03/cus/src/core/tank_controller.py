@@ -30,20 +30,16 @@ class TankController(BaseService):
         super().__init__("tank_controller", event_bus)
         
         # State management
-        self._current_state: SystemStateBase = AutomaticSystemState()
+        self._current_state: SystemStateBase = UnconnectedState()
         self._last_level_timestamp = time.time()  # Unix timestamp in seconds
-        
         # Track last value from each source (who) for pot
         self._pot_sources: dict[str, float] = {}  # {source_id: last_value}
         self._last_pot_value: float = 0.0
-        
+        self.source_id: str = ""
         # Water level history
         self._water_levels: List[LevelReading] = []
         
-        # Subscribe to domain events
-        self.bus.subscribe("sensor.level", self._on_level_event)
-        self.bus.subscribe("button.pressed", self._on_button_pressed)
-        self.bus.subscribe("manual.valve_command", self._on_manual_valve)
+        # NOTE: Topic subscriptions are done in main.py, not here
         
         logger.info(f"[{self.name}] FSM initialized: {self._current_state.get_state_name()}")
 
@@ -52,20 +48,20 @@ class TankController(BaseService):
         Event-driven FSM: reacts to events via pubsub callbacks.
         Periodic loop only checks for connectivity timeout.
         """
-        print(f"[{self.name}] 🚀 RUN LOOP STARTED")
+        #print(f"[{self.name}] 🚀 RUN LOOP STARTED")
         while self._running:
             # Check timeout (convert to milliseconds for config comparison)
             current_time = time.time()
-            print(f"[{self.name}] ⏱️ Running periodic check at {current_time}, last level timestamp: {self._last_level_timestamp}")
+            #print(f"[{self.name}] ⏱️ Running periodic check at {current_time}, last level timestamp: {self._last_level_timestamp}")
             elapsed_ms = int((current_time - self._last_level_timestamp) * 1000)
-            print(f"[{self.name}] ⏱️ Elapsed: {elapsed_ms}ms, checking timeout...")
+            #print(f"[{self.name}] ⏱️ Elapsed: {elapsed_ms}ms, checking timeout...")
             self._current_state.check_timeout(elapsed_ms, self)
             
             await asyncio.sleep(1.0)
 
     def _on_level_event(self, reading: dict):
         """Delegate sensor.level event to current state."""
-        print(f"[{self.name}] 📊 Level event received: {reading}")
+        #print(f"[{self.name}] 📊 Level event received: {reading}")
 
         # Update timestamp
         logger.info(f"[{self.name}] Level event received: {reading}")
@@ -74,22 +70,35 @@ class TankController(BaseService):
         measure = LevelReading(water_level=reading["level"], timestamp=reading["timestamp"])
         self._water_levels.append(measure)
         
-        print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
+        #print(f"[{self.name}] ✅ Level stored: {measure.water_level}cm at {measure.timestamp}")
         
         # Delegate to state
         self._current_state.handle_level_event(measure.water_level, measure.timestamp, self)
 
     def _on_button_pressed(self, btn):
         """Delegate button.pressed event to current state."""
-        self._current_state.handle_button_pressed(self)
+        if btn:
+            print(f"[{self.name}] 🔘 Button pressed!")
+            self._current_state.handle_button_pressed(self)
 
-    def _on_manual_valve(self, pot: dict):
-        """Delegate manual.valve_command event to current state."""
-        if self._who.get(who) != value:
-            logger.info(f"Manual valve command from {who}: {value}")
-            self._who[who] = value
-            opening = value
-        self._current_state.handle_manual_valve(opening, self)
+    def _on_manual_valve(self, pot):
+        """
+        Delegate manual.valve_command event to current state.
+        
+        Handles both formats:
+        - New format: pot={"val": X, "who": "source_id"}
+        - Legacy format: value=X (for backward compatibility)
+        
+        Only propagates value changes from specific sources.
+        """
+        # Handle legacy format
+        if isinstance(pot, dict) and "val" in pot and "who" in pot:
+            value = pot["val"]
+            source_id = pot["who"]
+        else:
+            value = pot
+            source_id = "legacy"
+        self._current_state.handle_manual_valve(value, self)
 
     def transition_to(self, new_state: SystemStateBase):
         """
