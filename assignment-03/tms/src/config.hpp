@@ -23,8 +23,8 @@
 /***********************
  * WIFI CONFIGURATION
  ***********************/
-#define WIFI_SSID "Redmi 10"
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID "wifi"
+#define WIFI_PASSWORD "psw"
 
 /***********************
  * MQTT CONFIGURATION
