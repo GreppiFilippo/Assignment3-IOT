@@ -17,7 +17,7 @@ SERIAL_SEND_INTERVAL=0.5  # Time interval to send data to Arduino (in seconds)
 
 
 # === Serial Configuration ===
-SERIAL_PORT = "/dev/cu.usbmodem14101"  # Change to "/dev/ttyUSB0" on Linux/Mac
+SERIAL_PORT = "/dev/cu.usbmodem1301"  # Change to "/dev/ttyUSB0" on Linux/Mac
 SERIAL_BAUDRATE = 115200
 
 # === HTTP Configuration ===
