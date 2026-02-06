@@ -42,10 +42,10 @@ void setup()
     SensorsTask* pSensorsTask = new SensorsTask(pContext, pHWPlatform->getProximitySensor());
     pSensorsTask->init();
 
-    TaskRunner* pNetworkTaskRunner =
-        new TaskRunner(pNetworkTask, "NetworkTask", 4096, 1, pdMS_TO_TICKS(1000), 1);
+    TaskRunner* pNetworkTaskRunner = new TaskRunner(pNetworkTask, "NetworkTask", 10000, 1,
+                                                    pdMS_TO_TICKS(NETWORK_INTERVAL_MS), 0);
 
-    TaskRunner* pSensorsTaskRunner = new TaskRunner(pSensorsTask, "SensorsTask", 4096, 1,
+    TaskRunner* pSensorsTaskRunner = new TaskRunner(pSensorsTask, "SensorsTask", 10000, 1,
                                                     pdMS_TO_TICKS(SAMPLING_INTERVAL_MS), 1);
 
     Logger.log(F("TMS: Setup completed."));

@@ -12,13 +12,13 @@
 /***********************
  * SONAR PARAMETERS
  ***********************/
-#define SONAR_MAX_DISTANCE_CM 200
-#define SONAR_TIMEOUT_US 30000  // microseconds
+#define SONAR_TIMEOUT_US 30000
 
 /***********************
  * SAMPLING PARAMETERS
  ***********************/
-#define SAMPLING_INTERVAL_MS 1000  // sampling interval in milliseconds
+#define SAMPLING_INTERVAL_MS 2000
+#define NETWORK_INTERVAL_MS 1000
 
 /***********************
  * WIFI CONFIGURATION
@@ -33,14 +33,6 @@
 #define MQTT_PORT 1883
 #define MQTT_TOPIC_LEVEL "tank/level"
 #define MQTT_CLIENT_ID "ESP32_TMS"
-
-/***********************
- * THRESHOLDS & TIMERS
- ***********************/
-#define LEVEL_L1 50    // cm, threshold for partial opening
-#define LEVEL_L2 80    // cm, threshold for full opening
-#define TIME_T1 30000  // ms, time above L1 before partial opening
-#define TIME_T2 10000  // ms, network timeout before entering UNCONNECTED
 
 /***********************
  * SERIAL CONFIGURATION

@@ -5,8 +5,6 @@
 #include "config.hpp"
 #include "kernel/Logger.hpp"
 
-#define T (SAMPLING_INTERVAL_MS)
-
 NetworkTask::NetworkTask(NetworkConnectionService* pNetworkService,
                          ProtocolService* pProtocolService, Light* pAliveLight, Light* pErrorLight,
                          Context* pContext)
@@ -19,7 +17,7 @@ NetworkTask::NetworkTask(NetworkConnectionService* pNetworkService,
     this->setState(CONNECTING);
 }
 
-void NetworkTask::init() { this->lastSentTime = 0; }
+void NetworkTask::init() {}
 
 void NetworkTask::tick()
 {
@@ -70,11 +68,7 @@ void NetworkTask::tick()
                 this->setState(NETWORK_ERROR);
             }
 
-            if (millis() - this->lastSentTime >= T)
-            {
-                this->sendData();
-                this->lastSentTime = millis();
-            }
+            this->sendData();
             break;
         case NETWORK_ERROR:
             if (this->checkAndSetJustEntered())
@@ -135,14 +129,13 @@ void NetworkTask::sendData()
 
     Message** msgs = this->pContext->getMessages();
     int sentCount = 0;
-    char buffer[128];
+
     for (int i = 0; msgs[i] != nullptr; i++)
     {
         if (this->pProtocolService->send(msgs[i]))
         {
-            snprintf(buffer, sizeof(buffer), "[NT] Sent message: topic=%s payload=%s",
-                     msgs[i]->topic, msgs[i]->payload);
-            Logger.log(buffer);
+            Logger.log(String("[NT] Sent message: topic=") + String(msgs[i]->topic) +
+                       String(" payload=") + String(msgs[i]->payload));
             sentCount++;
         }
         else

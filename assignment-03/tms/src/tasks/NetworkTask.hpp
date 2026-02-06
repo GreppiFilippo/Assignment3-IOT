@@ -19,7 +19,6 @@ class NetworkTask : public Task
 
     bool justEntered;
     unsigned long stateTimestamp;
-    unsigned long lastSentTime;
 
     /**
      * @brief Network Task State

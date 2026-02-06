@@ -1,5 +1,5 @@
 /* ===== CONFIGURATION ===== */
-const MAX_READINGS = 60;
+const MAX_READINGS = 20;
 const POLL_INTERVAL_MS = 2000;
 
 // Chart visual constants

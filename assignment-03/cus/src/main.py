@@ -1,91 +1,93 @@
 import asyncio
 import signal
-import time
+
 from services.event_bus import EventBus
 from services.serial_service import SerialService
 from services.mqtt_service import MQTTService
 from services.http_service import HttpService
 from core.tank_controller import TankController
-from core.system_states import AutomaticSystemState
 from config import *
 from utils.logger import get_logger
 
-
 logger = get_logger(__name__)
 
+
 async def main():
-    # 1. Initialize the Single Instance of the Event Bus
+    # 1. Event Bus
     bus = EventBus()
 
-    # 2. Instantiate the Event-Driven FSM Controller
+    # 2. Controller (FSM)
     controller = TankController(event_bus=bus)
 
     bus.subscribe(MODE_CHANGE_TOPIC, controller._on_button_pressed)
     bus.subscribe(POT_TOPIC, controller._on_manual_valve)
     bus.subscribe(LEVEL_IN_TOPIC, controller._on_level_event)
-    
-    # 3. Instantiate Infrastructure Adapters
+
+    # 3. Serial Service
     serial_service = SerialService(
-        port=SERIAL_PORT, 
-        baudrate=SERIAL_BAUDRATE, 
+        port=SERIAL_PORT,
+        baudrate=SERIAL_BAUDRATE,
         event_bus=bus,
-        send_interval=SERIAL_SEND_INTERVAL
+        send_interval=SERIAL_SEND_INTERVAL,
     )
 
     bus.subscribe(MODE_TOPIC, serial_service.on_mode_change)
     bus.subscribe(OPENING_TOPIC, serial_service.on_valve_command)
-    
+
+    # 4. MQTT Service
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,
         port=MQTT_BROKER_PORT,
         event_bus=bus,
-        qos=1
+        qos=1,
     )
-    
-    # Configure MQTT to only receive messages from broker
+
     mqtt_service.configure_messaging(
         incoming={
-            "tank/level": LEVEL_IN_TOPIC,  # MQTT tank/level -> bus level_in
+            "tank/level": LEVEL_IN_TOPIC,
         }
     )
-    
+
+    # 5. HTTP Service
     http_service = HttpService(
         event_bus=bus,
         host=HTTP_HOST,
         port=HTTP_PORT,
         publish_interval=10.0,
-        api_prefix="/api/v1"
+        api_prefix="/api/v1",
     )
 
     bus.subscribe(LEVELS_OUT_TOPIC, http_service.on_levels_out)
     bus.subscribe(MODE_TOPIC, http_service.on_mode_update)
     bus.subscribe(OPENING_TOPIC, http_service.on_valve_update)
-    
-    # Map topics to REST endpoints
-    # POST endpoints - ricevono dati HTTP e li pubblicano sul bus        # POST /api/v1/pot - invia comando pot
-    
-    # 5. Start all services concurrently
-    services = [controller, serial_service, mqtt_service, http_service]  # TEST: Serial + MQTT
-    
-    print("=" * 80)
-    print("🚀 Starting all system services...")
-    print(f"Services to start: {[s.name for s in services]}")
-    print("=" * 80)
-    logger.info("🚀 Starting all system services...")
-    logger.info(f"Services to start: {[s.name for s in services]}")
-    await asyncio.gather(*(service.start() for service in services))
 
-    # 6. Graceful shutdown handler
+    # 6. Start services
+    services = [
+        controller,
+        serial_service,
+        mqtt_service,
+        http_service,
+    ]
+
+    logger.info("🚀 Starting services...")
+    await asyncio.gather(*(s.start() for s in services))
+
+    # 7. Graceful shutdown
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
+
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop_event.set)
 
     try:
         await stop_event.wait()
     finally:
-        logger.info("🛑 Shutting down services...")
-        await asyncio.gather(*(service.stop() for service in services), return_exceptions=True)
+        logger.info("🛑 Stopping services...")
+        await asyncio.gather(
+            *(s.stop() for s in services),
+            return_exceptions=True,
+        )
+
 
 if __name__ == "__main__":
     try:
