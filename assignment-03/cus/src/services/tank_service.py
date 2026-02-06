@@ -32,13 +32,15 @@ class TankService(BaseService):
         super().__init__("tank_controller", event_bus)
         
         # State management
-        self._current_state: SystemStateBase = UnconnectedState()
+        self._current_state: SystemStateBase = None  # Will be set via transition_to
         self._last_level_timestamp = time.time()  # Unix timestamp in seconds
         # Track last value from each source (who) for pot
         self._last_pot_msg: dict[str, float] = {}  # {source_id: last_value}
         # Water level history
         self._water_levels: Deque[LevelReading] = deque(maxlen=config.MAX_READINGS)
 
+        # Initialize to UNCONNECTED state
+        self.transition_to(UnconnectedState())
         logger.info(f"[{self.name}] FSM initialized: {self._current_state.get_state_name()}")
 
     async def run(self):
@@ -102,11 +104,15 @@ class TankService(BaseService):
         Called by states themselves (not by external code).
         """
         old_state = self._current_state
-        old_state.on_exit(self)
+        
+        # Handle first transition (from None)
+        if old_state is not None:
+            old_state.on_exit(self)
+            logger.info(f"State transition: {old_state.get_state_name().value} → {new_state.get_state_name().value}")
+        else:
+            logger.info(f"Initial state: {new_state.get_state_name().value}")
         
         self._current_state = new_state
-        logger.info(f"State transition: {old_state.get_state_name().value} → {new_state.get_state_name().value}")
-        
         new_state.on_enter(self)
 
     # Public accessors for status queries
