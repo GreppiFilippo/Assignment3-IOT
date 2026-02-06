@@ -2,6 +2,7 @@ import asyncio
 import json
 import serial
 import time
+from enum import Enum
 from typing import Optional, Dict, Callable, Any
 from functools import partial
 
@@ -135,15 +136,27 @@ class SerialService(BaseService):
         except json.JSONDecodeError:
             logger.warning(f"[{self.name}] Invalid JSON received: {line}")
 
+    def _serialize_value(self, value):
+        """Convert value to JSON-serializable format (handles enums, etc.)."""
+        if isinstance(value, Enum):
+            return value.value
+        elif isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self._serialize_value(v) for v in value]
+        return value
+
     async def _write_serial_data(self, data: dict):
         """Send the current state as JSON to the hardware."""
         if self._serial is None: return
         try:
             loop = asyncio.get_running_loop()
             ser = self._serial
-            payload = (json.dumps(data) + '\n').encode('utf-8')
-            print(f"[{self.name}] 📤 Sending to WCS: {data}")
-            logger.debug(f"[{self.name}] Sending to WCS: {data}")
+            # Serialize data to handle enums and other non-JSON types
+            serializable_data = {k: self._serialize_value(v) for k, v in data.items()}
+            payload = (json.dumps(serializable_data) + '\n').encode('utf-8')
+            print(f"[{self.name}] 📤 Sending to WCS: {serializable_data}")
+            logger.debug(f"[{self.name}] Sending to WCS: {serializable_data}")
             await loop.run_in_executor(None, lambda: ser.write(payload))
             await loop.run_in_executor(None, ser.flush)
         except Exception as e:
