@@ -42,7 +42,7 @@ The system consists of **4 independent subsystems** that communicate with each o
 
 ### Tank Monitoring Subsystem (TMS)
 
-!["TMS wiring"](tmsWiring.png)
+!["TMS wiring"](tms/schema.png)
 
 **Features**:
 - Continuous water level sampling at frequency F
