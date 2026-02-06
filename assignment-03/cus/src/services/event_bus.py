@@ -28,7 +28,10 @@ class EventBus:
     def subscribe(self, topic: str, callback: Callable):
         """Subscribe a listener to a specific topic."""
         try:
+            print(f"[EventBus] 🔌 Subscribing to '{topic}' with callback {callback}")
             self._engine.subscribe(callback, topic)
             logger.info(f"[Bus] New subscription on: {topic}")
+            print(f"[EventBus] ✅ Subscription successful for '{topic}'")
         except Exception as e:
+            print(f"[EventBus] ❌ Error subscribing to {topic}: {e}")
             logger.error(f"[Bus] Error subscribing to {topic}: {e}")

@@ -36,8 +36,16 @@ async def main():
     )
     
     # Subscribe to bus topics to update serial state
-    bus.subscribe(MODE_TOPIC, lambda mode: serial_service.on_state_change("mode", mode=mode))
-    bus.subscribe(OPENING_TOPIC, lambda opening: serial_service.on_state_change("valve", opening=opening))
+    def _on_mode_change(mode):
+        print(f"[main] 🎯 _on_mode_change called with mode={mode}")
+        serial_service.on_state_change("mode", mode=mode)
+    
+    def _on_opening_change(opening):
+        print(f"[main] 🎯 _on_opening_change called with opening={opening}")
+        serial_service.on_state_change("valve", opening=opening)
+    
+    bus.subscribe(MODE_TOPIC, _on_mode_change)
+    bus.subscribe(OPENING_TOPIC, _on_opening_change)
 
     # 2. Instantiate the Event-Driven FSM Controller (AFTER subscriptions)
     tank_service = TankService(event_bus=bus)
