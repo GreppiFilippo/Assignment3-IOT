@@ -116,6 +116,8 @@ bool NetworkTask::checkAndSetJustEntered()
 
 void NetworkTask::sendData()
 {
+    char buffer[256];
+    
     if (!this->pProtocolService->isConnected())
     {
         return;
