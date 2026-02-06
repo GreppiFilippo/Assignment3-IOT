@@ -11,6 +11,7 @@ void SensorsTask::tick() { measureLevel(); }
 
 void SensorsTask::measureLevel()
 {
+    Logger.log(F(("[ST] Measuring water level...")));
     level = pSonar->getDistance();
     pContext->setWaterLevel(level, millis());
 }
