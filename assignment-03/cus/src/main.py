@@ -17,14 +17,7 @@ async def main():
     # 1. Initialize the Single Instance of the Event Bus
     bus = EventBus()
 
-    # 2. Instantiate the Event-Driven FSM Controller
-    tank_service = TankService(event_bus=bus)
-
-    bus.subscribe(MODE_CHANGE_TOPIC, tank_service._on_button_pressed)
-    bus.subscribe(POT_TOPIC, tank_service._on_manual_valve)
-    bus.subscribe(LEVEL_IN_TOPIC, tank_service._on_level_event)
-    
-    # 3. Instantiate Infrastructure Adapters
+    # 3. Instantiate Infrastructure Adapters FIRST (before TankService)
     serial_service = SerialService(
         port=SERIAL_PORT, 
         baudrate=SERIAL_BAUDRATE, 
@@ -45,6 +38,13 @@ async def main():
     # Subscribe to bus topics to update serial state
     bus.subscribe(MODE_TOPIC, lambda mode: serial_service.on_state_change("mode", mode=mode))
     bus.subscribe(OPENING_TOPIC, lambda opening: serial_service.on_state_change("valve", opening=opening))
+
+    # 2. Instantiate the Event-Driven FSM Controller (AFTER subscriptions)
+    tank_service = TankService(event_bus=bus)
+
+    bus.subscribe(MODE_CHANGE_TOPIC, tank_service._on_button_pressed)
+    bus.subscribe(POT_TOPIC, tank_service._on_manual_valve)
+    bus.subscribe(LEVEL_IN_TOPIC, tank_service._on_level_event)
     
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,

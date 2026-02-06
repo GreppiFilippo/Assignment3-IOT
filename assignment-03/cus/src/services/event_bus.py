@@ -18,9 +18,11 @@ class EventBus:
     def publish(self, topic: str, **kwargs):
         """Publish an event to a specific topic."""
         try:
+            print(f"[EventBus] 📢 Publishing to '{topic}' with {kwargs}")
             self._engine.sendMessage(topic, **kwargs)
             logger.debug(f"[Bus] Published to {topic} with {kwargs}")
         except Exception as e:
+            print(f"[EventBus] ❌ Error publishing to {topic}: {e}")
             logger.error(f"[Bus] Error publishing to {topic}: {e}")
 
     def subscribe(self, topic: str, callback: Callable):

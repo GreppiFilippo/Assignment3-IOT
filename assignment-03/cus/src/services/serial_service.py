@@ -61,10 +61,13 @@ class SerialService(BaseService):
         :param state_key: Key in the state dict
         :param kwargs: Data (if single value, extract it)
         """
+        print(f"[{self.name}] 🔧 on_state_change called: state_key={state_key}, kwargs={kwargs}")
         if len(kwargs) == 1:
             self._last_state_to_send[state_key] = list(kwargs.values())[0]
         else:
             self._last_state_to_send[state_key] = kwargs
+        print(f"[{self.name}] 📝 State updated: {state_key} = {self._last_state_to_send[state_key]}")
+        print(f"[{self.name}] 📦 Full state to send: {self._last_state_to_send}")
         logger.debug(f"[{self.name}] State updated: {state_key} = {self._last_state_to_send[state_key]}")
     
     async def setup(self):
