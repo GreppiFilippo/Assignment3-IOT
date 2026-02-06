@@ -5,7 +5,7 @@ from utils.logger import get_logger
 import config
 
 if TYPE_CHECKING:
-    from core.tank_controller import TankController
+    from src.services.tank_service import TankService
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class AutomaticSubStateBase(ABC):
         """
         pass
     
-    def on_enter(self, controller: 'TankController'):
+    def on_enter(self, controller: 'TankService'):
         """Called when entering this substate."""
         opening = self.get_valve_opening()
         controller.bus.publish(config.OPENING_TOPIC, opening=opening)

@@ -35,33 +35,20 @@ class SerialService(BaseService):
         self._read_buffer = ""
         self._last_send_time = 0.0
 
-        # -------------------------
-        # SERIAL STATE (IL "COSA")
-        # -------------------------
         self._state: Dict[str, Any] = {
             "mode": "UNCONNECTED",
             "valve": 0.0,
         }
 
-        # -------------------------
-        # EVENT → STATE MAPPING
-        # -------------------------
         self._event_field_map: Dict[str, Callable[[Any], Any]] = {
             "mode": lambda v: v.value if hasattr(v, "value") else str(v),
             "valve": float,
         }
 
-        # -------------------------
-        # SERIAL → BUS MAPPING
-        # -------------------------
         self._pub_topics: Dict[str, str] = {
             "pot": "pot",
             "btn": "btn",
         }
-
-    # =========================================================================
-    # LIFECYCLE
-    # =========================================================================
 
     async def setup(self):
         """Open the serial port using a thread executor to avoid blocking."""
@@ -106,10 +93,6 @@ class SerialService(BaseService):
             self._serial.close()
             logger.info(f"[{self.name}] Serial port closed.")
 
-    # =========================================================================
-    # GENERIC STATE UPDATE (IL "COME")
-    # =========================================================================
-
     def on_event(self, field: str, value: Any):
         if field not in self._event_field_map:
             logger.warning(f"[{self.name}] Unknown state field: {field}")
@@ -122,19 +105,11 @@ class SerialService(BaseService):
             f"[{self.name}] State updated: {field}={self._state[field]}"
         )
 
-    # =========================================================================
-    # ADAPTERS (SOTTILI, STUPIDI, STABILI)
-    # =========================================================================
-
     def on_mode_change(self, mode: Any):
         self.on_event("mode", mode)
 
     def on_valve_command(self, opening: float):
         self.on_event("valve", opening)
-
-    # =========================================================================
-    # SERIAL IO
-    # =========================================================================
 
     async def _read_serial_data(self):
         if self._serial is None:

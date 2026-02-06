@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import json
 import time
 import paho.mqtt.client as mqtt
@@ -9,13 +10,19 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+class QOSLevel(enum.Enum):
+    """MQTT Quality of Service Levels."""
+    AT_MOST_ONCE = 0
+    AT_LEAST_ONCE = 1
+    EXACTLY_ONCE = 2
+
 class MQTTService(BaseService):
     """
     MQTT Infrastructure Adapter.
     Acts as a bridge between an external MQTT Broker and the internal EventBus.
     """
 
-    def __init__(self, broker: str, port: int, event_bus: EventBus, qos: int = 0, publish_interval: float = 5.0):
+    def __init__(self, broker: str, port: int, event_bus: EventBus, qos: QOSLevel = QOSLevel.AT_MOST_ONCE, publish_interval: float = 5.0):
         """
         Initialize the MQTT service.
         
@@ -28,7 +35,7 @@ class MQTTService(BaseService):
         super().__init__("mqtt_service", event_bus)
         self.broker = broker
         self.port = port
-        self.qos = qos
+        self.qos = qos.value
         self._publish_interval = publish_interval
         self._last_publish_time = 0.0
         
@@ -40,7 +47,6 @@ class MQTTService(BaseService):
         self._incoming_map: Dict[str, str] = {}
         # Internal topics to listen to for publishing to MQTT: { "bus.topic": "mqtt/topic" }
         self._outgoing_map: Dict[str, str] = {}
-        # Cache ultimo stato ricevuto per pubblicazione periodica
         self._last_bus_data: Dict[str, dict] = {}
 
         # Configure Callbacks
@@ -72,10 +78,8 @@ class MQTTService(BaseService):
 
     async def setup(self):
         """Establish connection with the MQTT broker."""
-        print(f"[{self.name}] setup() called - incoming map: {self._incoming_map}")
-        logger.info(f"[{self.name}] setup() called - incoming map: {self._incoming_map}")
+        logger.debug(f"[{self.name}] setup() called - incoming map: {self._incoming_map}")
         try:
-            print(f"[{self.name}] Attempting to connect to broker {self.broker}:{self.port}...")
             logger.info(f"[{self.name}] Attempting to connect to broker {self.broker}:{self.port}...")
             # Connect using the thread executor to prevent blocking the event loop
             loop = asyncio.get_running_loop()
@@ -83,10 +87,8 @@ class MQTTService(BaseService):
             
             # Start the background threaded loop provided by paho-mqtt
             self._client.loop_start()
-            print(f"[{self.name}] MQTT loop started, waiting for connection callback...")
             logger.info(f"[{self.name}] MQTT loop started, waiting for connection callback...")
         except Exception as e:
-            print(f"[{self.name}] Failed to connect to MQTT broker: {e}")
             logger.error(f"[{self.name}] Failed to connect to MQTT broker: {e}")
 
     async def run(self):
@@ -94,7 +96,6 @@ class MQTTService(BaseService):
         logger.info(f"[{self.name}] run() started, entering main loop...")
         while self._running:
             if self._connected:
-                # Pubblicazione periodica
                 now = time.monotonic()
                 if now - self._last_publish_time >= self._publish_interval:
                     await self._periodic_publish()
@@ -121,12 +122,9 @@ class MQTTService(BaseService):
         """Callback invoked when connected to the broker."""
         if rc == 0:
             self._connected = True
-            # print(f"[{self.name}] ✅ Successfully connected to MQTT broker.")
             logger.info(f"[{self.name}] Successfully connected to MQTT broker.")
-            # Subscribe to all mapped external topics
             for mqtt_topic in self._incoming_map.keys():
                 client.subscribe(mqtt_topic, qos=self.qos)
-                # print(f"[{self.name}] 📡 Subscribed to MQTT: {mqtt_topic}")
                 logger.info(f"[{self.name}] Subscribed to MQTT: {mqtt_topic}")
         else:
             logger.error(f"[{self.name}] Connection failed with result code {rc}")
@@ -151,14 +149,11 @@ class MQTTService(BaseService):
                     # Fix timestamp if present (ESP sends uptime, we need absolute time)
                     # Use the injected bus to notify the rest of the system
                     self.bus.publish(bus_topic, **payload)
-                    # print(f"[{self.name}] ✅ Published to bus: {bus_topic}")
                 else:
                     # Skip non-dict payloads (e.g., simple integers or strings)
-                    # print(f"[{self.name}] ⚠️  Skipping non-dict payload: {payload}")
                     logger.warning(f"[{self.name}] Skipping non-dict payload from {mqtt_topic}: {payload}")
                     
         except Exception as e:
-            # print(f"[{self.name}] ❌ Error processing MQTT message: {e}")
             logger.error(f"[{self.name}] Error processing MQTT message: {e}")
 
     def _make_outgoing_handler(self, bus_topic: str):
@@ -167,10 +162,8 @@ class MQTTService(BaseService):
         
         def handler(**kwargs):
             try:
-                # Salva in cache per pubblicazione periodica
                 self._last_bus_data[bus_topic] = kwargs
                 
-                # Pubblica immediatamente su MQTT
                 payload = json.dumps(kwargs)
                 self._client.publish(mqtt_topic, payload, qos=self.qos)
                 logger.debug(f"[{self.name}] Bus({bus_topic}) → MQTT({mqtt_topic})")

@@ -42,7 +42,6 @@ class HttpService(BaseService):
         self._api_prefix = api_prefix.rstrip("/")
         self._latest_received: Dict[str, Any] = {}
 
-        # ✅ Inizializza il dizionario per pubblicazioni periodiche
         self._publish_topics: Dict[str, Callable[[], Any]] = {}
 
         # FastAPI app

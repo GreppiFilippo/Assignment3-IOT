@@ -3,9 +3,9 @@ import signal
 
 from services.event_bus import EventBus
 from services.serial_service import SerialService
-from services.mqtt_service import MQTTService
+from services.mqtt_service import MQTTService, QOSLevel
 from services.http_service import HttpService
-from core.tank_controller import TankController
+from services.tank_service import TankService
 from config import *
 from utils.logger import get_logger
 
@@ -17,7 +17,7 @@ async def main():
     bus = EventBus()
 
     # 2. Controller (FSM)
-    controller = TankController(event_bus=bus)
+    controller = TankService(event_bus=bus)
 
     bus.subscribe(MODE_CHANGE_TOPIC, controller._on_button_pressed)
     bus.subscribe(POT_TOPIC, controller._on_manual_valve)
@@ -39,7 +39,7 @@ async def main():
         broker=MQTT_BROKER_HOST,
         port=MQTT_BROKER_PORT,
         event_bus=bus,
-        qos=1,
+        qos=QOSLevel.AT_LEAST_ONCE,
     )
 
     mqtt_service.configure_messaging(
