@@ -43,8 +43,8 @@ async def main():
     )
     
     # Subscribe to bus topics to update serial state
-    bus.subscribe(MODE_TOPIC, lambda **kw: serial_service.on_state_change("mode", **kw))
-    bus.subscribe(OPENING_TOPIC, lambda **kw: serial_service.on_state_change("valve", **kw))
+    bus.subscribe(MODE_TOPIC, lambda mode: serial_service.on_state_change("mode", mode=mode))
+    bus.subscribe(OPENING_TOPIC, lambda opening: serial_service.on_state_change("valve", opening=opening))
     
     mqtt_service = MQTTService(
         broker=MQTT_BROKER_HOST,
@@ -75,9 +75,9 @@ async def main():
     http_service.add_post_endpoint("/pot", POT_TOPIC, "pot")
     
     # Subscribe to bus topics to update HTTP state
-    bus.subscribe(LEVELS_OUT_TOPIC, lambda **kw: http_service.on_state_update("levels", **kw))
-    bus.subscribe(MODE_TOPIC, lambda **kw: http_service.on_state_update("mode", **kw))
-    bus.subscribe(OPENING_TOPIC, lambda **kw: http_service.on_state_update("valve", **kw))
+    bus.subscribe(LEVELS_OUT_TOPIC, lambda levels: http_service.on_state_update("levels", levels=levels))
+    bus.subscribe(MODE_TOPIC, lambda mode: http_service.on_state_update("mode", mode=mode))
+    bus.subscribe(OPENING_TOPIC, lambda opening: http_service.on_state_update("valve", opening=opening))
     
     # 5. Start all services concurrently
     services = [tank_service, serial_service, mqtt_service, http_service]  # TEST: Serial + MQTT
