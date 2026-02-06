@@ -1,4 +1,0 @@
-- based on Arduino
-- Embedded system controlling the water channel connecting the tank with the water channel network. 
-- It interacts via serial line with the Control Unit Subsystem (CUS).
-- It provides a panel for human operators to interact in place.
