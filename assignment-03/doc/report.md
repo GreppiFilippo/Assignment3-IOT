@@ -16,15 +16,7 @@
 
 ## Introduction
 
-The **Smart Tank Monitoring System** is a distributed IoT system for monitoring and controlling rainwater levels in a tank. The system automatically manages the opening of a valve to drain water into a channel network when the level exceeds certain thresholds.
-
-### Project Objectives
-- Continuous water level monitoring via sonar sensor
-- Automatic/manual control of drainage valve
-- Remote visualization of system state through web dashboard
-- Error and disconnection condition handling
-
----
+The **Smart Tank Monitoring System** is a distributed IoT system for monitoring and controlling rainwater levels in a tank. The system automatically manages the opening of a valve to drain water into a channel network when the level exceeds certain thresholds or allows manual control via a web dashboard or a physical potentiometer. The system also provides real-time visualization of water levels and valve status.
 
 ## System Architecture
 
@@ -42,155 +34,100 @@ The system consists of **4 independent subsystems** that communicate with each o
 
 ### Tank Monitoring Subsystem (TMS)
 
+**Platform**: ESP32 with FreeRTOS
+
 !["TMS wiring"](tms/schema.png)
 
-**Features**:
-- Continuous water level sampling at frequency F
-- Data transmission to CUS via MQTT
-- Connection status indication via LEDs:
-  - **Green ON**: System working correctly
-  - **Red ON**: Network problems
+**Hardware Components**:
+- Sonar sensor (HC-SR04) for water level measurement
+- Green LED (alive/connection OK indicator)
+- Red LED (error/network problem indicator)
 
 **Software Architecture**:
-- Implementation based on **Finite State Machine (FSM)** and **RTOS tasks**
-- Use of FreeRTOS for concurrent operation management
-- Main tasks:
-  - `SensorTask`: Periodic sonar reading
-  - `MqttTask`: Data publishing and connection management
-  - `LedTask`: LED indicator control
+Two independent tasks running on FreeRTOS:
 
-#### FSM - TMS
-```
-     ┌──────────────┐
-     │  INIT        │
-     └──────┬───────┘
-            │
-            ▼
-     ┌──────────────┐       Network Error
-     │  CONNECTED   │────────────────────┐
-     │  (Green LED) │                    │
-     └──────┬───────┘                    │
-            │                            ▼
-            │ Sample & Publish    ┌──────────────┐
-            └────────►            │ DISCONNECTED │
-                                  │  (Red LED)   │
-                                  └──────┬───────┘
-                                         │
-                                         │ Network OK
-                                         └────────────►
-```
+1. **SensorsTask**: Samples water level periodically and stores data in shared context
+2. **NetworkTask**: FSM managing WiFi/MQTT connection and data transmission
 
-**Libraries Used**:
-- PubSubClient (MQTT)
-- WiFi (ESP32)
-- NewPing (Sonar)
+**Network Task FSM**:
 
----
+![Network Task FSM](tms/network_task.svg)
+
+**States**:
+- **CONNECTING**: Establishing WiFi and MQTT connection
+- **NETWORK_OK**: Connected, transmitting data (Green LED ON)
+- **NETWORK_ERROR**: Connection lost, attempting reconnect (Red LED ON)
+
+
 
 ### Water Channel Subsystem (WCS)
 
-**Hardware**: Arduino UNO, Servo motor, Potentiometer, Button, LCD I2C
+**Platform**: Arduino UNO with cooperative scheduler
 
-**Features**:
-- Valve opening control (0° = closed, 90° = 100% open)
-- AUTOMATIC/MANUAL switch via button
-- Manual control via potentiometer
-- LCD display shows:
-  - Valve opening percentage
-  - Current operating mode
+!["WCS wiring"](wcs/schema.png)
+
+**Hardware Components**:
+- Servo motor (valve control, 0° = closed, 90° = 100% open)
+- Push button (mode switch)
+- Potentiometer (manual valve control)
+- LCD display (16x2)
 
 **Software Architecture**:
-- **Task-based architecture** with cooperative scheduler
-- Use of `TimerOne` for periodic scheduling
-- Main tasks:
-  - `ServoControlTask`: Servo position management
-  - `ButtonTask`: Debouncing and press handling
-  - `PotentiometerTask`: Analog input reading
-  - `LCDTask`: Display update
-  - `MsgTask`: Serial communication with CUS
+Task-based architecture with 4 cooperative tasks:
 
-#### FSM - WCS
-```
-           ┌──────────────┐
-           │     INIT     │
-           └──────┬───────┘
-                  │
-                  ▼
-      ┌───────────────────────┐
-      │     AUTOMATIC         │◄────────┐
-      │  Servo controlled     │         │
-      │     by CUS            │         │
-      └───────────┬───────────┘         │
-                  │                     │
-         Button   │                     │ Button
-         Press    │                     │ Press
-                  ▼                     │
-      ┌───────────────────────┐         │
-      │      MANUAL           │─────────┘
-      │  Servo controlled     │
-      │  by Potentiometer     │
-      └───────────────────────┘
-```
+1. **SystemTask**: FSM managing connection state (UNCONNECTED/CONNECTED) and mode switching
+2. **ValveTask**: FSM controlling servo motor movement (IDLE/MOVING)
+3. **MsgTask**: Serial communication with CUS (JSON commands/events)
+4. **LCDTask**: Updates LCD display with valve position and mode
 
-**Libraries Used**:
-- Servo
-- LiquidCrystal_I2C
-- TimerOne
-- ArduinoJson (serial communication)
+**System Task FSM**:
 
----
+![System Task FSM](wcs/system_task.svg)
+
+**States**:
+- **UNCONNECTED**: No CUS communication, potentiometer controls valve
+- **CONNECTED**: CUS commands control valve, displays AUTOMATIC/MANUAL mode
+
+**Valve Task FSM**:
+
+![Valve Task FSM](wcs/valve_task.svg)
+
+**States**:
+- **IDLE**: Servo off, waiting for position change
+- **MOVING**: Servo active, moving to target position
 
 ### Control Unit Subsystem (CUS)
 
-**Platform**: PC/Server (Node.js / Python)
+Built as event-driven microservice architecture using Python's asyncio framework.
+It uses the state pattern to implement the control policy for valve management based on TMS data and operator input.
+It is composed by a central event bus using the pub/sub pattern, and the services:
+Tank Service is the core FSM implementing the control policy, while the others are responsible for communication with the other subsystems (SerialService for WCS, MQTTService for TMS, HttpService for DBS).
 
-**Features**:
-- **Policy Engine**: Implements control logic
-  - L₁ < level < L₂ for T₁ → Valve 50%
-  - Level > L₂ → Valve 100% immediately
-- TMS communication timeout management (T₂)
-- Coordination between all subsystems
-- HTTP API for DBS
-- MQTT-Serial bridge
+**Platform**: Python (asyncio-based architecture)
 
-**Communications**:
-- **MQTT Broker**: Data reception from TMS
-- **HTTP Server**: REST API for DBS
-- **Serial**: Command transmission to WCS
+**Architecture Components**:
+1. **EventBus**: Pub/sub message broker for inter-service communication
+2. **TankService**: Core FSM implementing control policy
+3. **SerialService**: JSON communication with WCS via serial port
+4. **MQTTService**: Level data reception from TMS
+5. **HttpService**: REST API (FastAPI) for DBS
 
-**Technologies**:
-- Runtime: Node.js / Python
-- MQTT: Mosquitto broker or embedded
-- HTTP: Express.js / Flask
-- Serial: serialport / pyserial
+**TankService FSM**:
 
-#### FSM - CUS
-```
-       ┌──────────────┐
-       │    IDLE      │
-       └──────┬───────┘
-              │
-              ▼
-    ┌─────────────────┐      No data for T₂
-    │    NORMAL       │────────────────────┐
-    │  Processing     │                    │
-    │  data from TMS  │                    │
-    └─────────┬───────┘                    │
-              │                            ▼
-              │ level > L₁          ┌──────────────┐
-              ▼                     │ UNCONNECTED  │
-    ┌─────────────────┐            │  Error State │
-    │   ALARM_L1      │            └──────┬───────┘
-    │  Valve 50%      │                   │
-    └─────────┬───────┘                   │ Data received
-              │                           └────────────►
-              │ level > L₂
-              ▼
-    ┌─────────────────┐
-    │   ALARM_L2      │
-    │  Valve 100%     │
-    └─────────────────┘
-```
+![CUS FSM](cus/tank_service_fsm.svg)
+
+**System States**:
+- **UNCONNECTED**: No TMS data received, waiting for first level reading
+- **AUTOMATIC**: FSM controls valve with 4 substates:
+  - **NORMAL**: Level OK, valve 0%
+  - **TRACKING_PRE_ALARM**: L1 < level < L2, starting T1 timer
+  - **PRE_ALARM**: T1 expired, valve 50%
+  - **ALARM**: Level ≥ L2, valve 100%
+- **MANUAL**: Operator controls valve via potentiometer/dashboard
+
+**Transitions**:
+- Button press toggles AUTOMATIC ↔ MANUAL
+- T2 timeout (no TMS data) → UNCONNECTED from any state
 
 ---
 
@@ -207,142 +144,8 @@ The system consists of **4 independent subsystems** that communicate with each o
   - Switch button AUTOMATIC ↔ MANUAL
   - Slider for manual opening control
 
-**Technologies**:
-- Frontend: HTML5, CSS3, JavaScript
-- Charting: Chart.js / D3.js
-- Communication: Fetch API / WebSocket
-- UI Framework: Bootstrap / Vue.js
-
-**Structure**:
-```html
-┌────────────────────────────────────┐
-│  Smart Tank Dashboard              │
-├────────────────────────────────────┤
-│  [Chart: Water Level History]      │
-│                                    │
-│  Status: AUTOMATIC ●               │
-│  Valve Opening: 75% [=========   ] │
-│                                    │
-│  [Switch to MANUAL]                │
-│  Manual Control: [==========] 50%  │
-└────────────────────────────────────┘
-```
-
----
-
-## Communication Protocols
-
-### MQTT (TMS ↔ CUS)
-**Topic Structure**:
-- `tank/sensor/level` - Water level publication (TMS → CUS)
-- `tank/status` - Connection status (TMS → CUS)
-
-**Payload Example** (JSON):
-```json
-{
-  "level": 145,
-  "timestamp": 1675234567,
-  "unit": "cm"
-}
-```
-
-### Serial (WCS ↔ CUS)
-**Format**: JSON over Serial Line (9600 baud)
-
-**Commands CUS → WCS**:
-```json
-{
-  "cmd": "SET_VALVE",
-  "value": 75
-}
-```
-
-**Responses WCS → CUS**:
-```json
-{
-  "mode": "AUTOMATIC",
-  "valve": 75,
-  "status": "OK"
-}
-```
-
-### HTTP (DBS ↔ CUS)
-**REST Endpoints**:
-- `GET /api/status` - Complete system status
-- `GET /api/history` - Water level history
-- `POST /api/mode` - Change operating mode
-- `POST /api/valve` - Set manual opening
-
----
-
-## Hardware Schema
-
-### TMS - ESP32
-```
-ESP32
-├─ GPIO 14 ─► Sonar TRIG
-├─ GPIO 12 ◄─ Sonar ECHO
-├─ GPIO 25 ─► Green LED
-├─ GPIO 26 ─► Red LED
-└─ WiFi ───► MQTT Broker
-```
-
-### WCS - Arduino UNO
-```
-Arduino UNO
-├─ Pin 9    ─► Servo Motor (PWM)
-├─ Pin A0   ◄─ Potentiometer
-├─ Pin 2    ◄─ Button (+ pull-up resistor)
-├─ SDA/SCL  ─► LCD I2C
-└─ Serial   ─► PC (CUS)
-```
-
-**[Insert breadboard/circuit diagram here]**
-
-![Breadboard Schema](../assignment-03-sketch.png)
-
----
 
 ## Demo Video
 
-**Demo video link**: [Insert YouTube/Drive link]
+[Watch the demonstration video](https://liveunibo-my.sharepoint.com/:v:/g/personal/filippo_greppi2_studio_unibo_it/IQDeM8AzXj4vT530_44pwb-SAQ6p9UIpJB-1nDFXG11v5kQ?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=RQHUjg)
 
-The video demonstrates:
-1. System boot and subsystem connection
-2. Automatic monitoring and valve opening when exceeding L₁
-3. 100% opening when exceeding L₂
-4. Switch to MANUAL mode via button/dashboard
-5. Manual control via potentiometer
-6. TMS disconnection handling (UNCONNECTED state)
-
----
-
-## Configuration Parameters
-
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| F | 1 Hz | TMS sampling frequency |
-| L₁ | 50 cm | Alert threshold level 1 |
-| L₂ | 80 cm | Alert threshold level 2 |
-| T₁ | 5 s | Time above L₁ before action |
-| T₂ | 10 s | TMS disconnection timeout |
-| N | 50 | Samples displayed in dashboard |
-
----
-
-## Conclusions
-
-The implemented system fulfills all required specifications, providing robust and distributed control of water level. The modular architecture allows easy maintenance and future extension. FSMs and concurrent tasks ensure deterministic behavior and system reactivity.
-
-### Possible Future Developments
-- Addition of multiple sensors for redundancy
-- Implementation of ML-based predictive algorithms
-- Mobile dashboard (Android/iOS app)
-- Database logging for historical analysis
-
----
-
-**Author**: [Student Name]  
-**Student ID**: [Student ID Number]  
-**Academic Year**: 2025/2026  
-**Course**: Embedded Systems and IoT - ISI LT
