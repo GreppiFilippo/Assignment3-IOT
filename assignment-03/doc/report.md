@@ -1,16 +1,14 @@
 # Assignment #03 - *Smart Tank Monitoring System*
 
-## Table of Contents
-1. [Introduction](#introduction)
-2. [System Architecture](#system-architecture)
-3. [Subsystems](#subsystems)
-   - [Tank Monitoring Subsystem (TMS)](#tank-monitoring-subsystem-tms)
-   - [Water Channel Subsystem (WCS)](#water-channel-subsystem-wcs)
-   - [Control Unit Subsystem (CUS)](#control-unit-subsystem-cus)
-   - [Dashboard Subsystem (DBS)](#dashboard-subsystem-dbs)
-4. [Communication Protocols](#communication-protocols)
-5. [Hardware Schema](#hardware-schema)
-6. [Demo Video](#demo-video)
+## Authors
+
+**Filippo Greppi**
+- Email: <filippo.greppi2@studio.unibo.it>
+- Student ID: 0001114837
+ 
+**Marcello Spagnoli**  
+- Email: <marcello.spagnoli2@studio.unibo.it>  
+- Student ID: 0001117244  
 
 ---
 
@@ -138,17 +136,47 @@ Tank Service is the core FSM implementing the control policy, while the others a
 
 ### Dashboard Subsystem (DBS)
 
-**Platform**: Web Application (Browser)
+**Platform**: Web Application (Browser)  
+**Technologies**: HTML5, Bootstrap 5, Chart.js 4, Vanilla JavaScript
 
-**Features**:
-- **Real-time chart**: Last N water level samples
-- **Status visualization**:
-  - Valve opening percentage
-  - Operating mode (AUTOMATIC/MANUAL/UNCONNECTED/NOT AVAILABLE)
-- **Controls**:
-  - Switch button AUTOMATIC ↔ MANUAL
-  - Slider for manual opening control
+**Architecture**:
 
+The DBS is a single-page web application that provides a real-time monitoring and control interface for the Smart Tank System. It communicates with the CUS via REST API (HTTP) with a polling-based approach.
+
+**Key Components**:
+
+1. **State Management**
+   - Polling interval: 2 seconds (configurable via `POLL_INTERVAL_MS`)
+   - Auto-refresh mechanism with pause/resume capability
+
+2. **Data Visualization**
+   - Real-time line chart using Chart.js with time-series support
+   - Displays last 20 water level samples (configurable via `MAX_READINGS`)
+
+3. **REST API Integration**
+   - `GET /api/v1/levels`: Fetches historical level readings
+   - `GET /api/v1/mode`: Retrieves current system state
+   - `GET /api/v1/valve`: Gets current valve opening percentage
+   - `POST /api/v1/change`: Toggles AUTOMATIC ↔ MANUAL mode
+   - `POST /api/v1/pot`: Sends manual valve opening command (0-100%)
+
+4. **User Interface Features**
+   - **Status Cards**:
+     - System State badge with color coding (green=AUTOMATIC, yellow=MANUAL, red=UNCONNECTED, gray=NOT_AVAILABLE)
+     - Valve opening percentage display
+     - Mode switch button
+     - Auto-refresh toggle with last update timestamp
+   
+   - **Manual Control Panel** (enabled only in MANUAL mode):
+     - Range slider (0-100%) for valve opening control
+     - Send button to apply selected valve position
+     - Visual feedback via slider value badge
+   
+   - **Notifications**:
+     - Toast notifications for operation feedback (success/error)
+     - Loading overlay during initial data fetch
+
+![Dashboard UI](dbs/dashboard.png)
 
 ## Demo Video
 
