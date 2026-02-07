@@ -1,0 +1,35 @@
+name: Create assignment-03.zip
+
+on:
+  workflow_dispatch:
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify assignment-03 structure
+        run: |
+          test -d assignment-03 || (echo "Missing assignment-03 folder" && exit 1)
+          for d in tms cus wcs DBS doc; do
+            test -d assignment-03/$d || (echo "Missing $d folder" && exit 1)
+          done
+
+      - name: Verify report exists
+        run: |
+          test -f assignment-03/doc/report.pdf || test -f assignment-03/doc/report.md || \
+          (echo "Missing report.pdf or report.md in doc" && exit 1)
+
+      - name: Create assignment-03.zip
+        run: |
+          cd assignment-03
+          zip -r ../assignment-03.zip tms cus wcs DBS doc
+
+      - name: Upload zip as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: assignment-03
+          path: assignment-03.zip
