@@ -70,7 +70,7 @@ Two independent tasks running on FreeRTOS:
 - Servo motor (valve control, 0° = closed, 90° = 100% open)
 - Push button (mode switch)
 - Potentiometer (manual valve control)
-- LCD display (16x2)
+- LCD display (20x4)
 
 **Software Architecture**:
 Task-based architecture with 4 cooperative tasks:
@@ -112,6 +112,8 @@ Tank Service is the core FSM implementing the control policy, while the others a
 4. **MQTTService**: Level data reception from TMS
 5. **HttpService**: REST API (FastAPI) for DBS
 
+![Control Unit Architecture](cus/class_diagram.svg)
+
 **TankService FSM**:
 
 ![CUS FSM](cus/tank_service_fsm.svg)
@@ -128,6 +130,9 @@ Tank Service is the core FSM implementing the control policy, while the others a
 **Transitions**:
 - Button press toggles AUTOMATIC ↔ MANUAL
 - T2 timeout (no TMS data) → UNCONNECTED from any state
+
+
+
 
 ---
 
